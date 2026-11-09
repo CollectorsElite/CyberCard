@@ -110,74 +110,127 @@ const LEVELUPS = [
   ['Promozione per anzianità', 'Nessuno sa cosa fai, ma lo fai da tanto.', 2]
 ];
 
-// Battute del narratore: una a caso per evento.
+// Battute dei fumetti: una a caso per evento. Il fumetto le attribuisce a chi ha appena agito,
+// quindi sono in prima persona (tranne audit, che esce senza mittente).
+// 'evento:chiave' vince sul generico: chiave = nome carta (sabotage) o primo effetto della minaccia (fleeKo).
+// Non iniziare con « né finire con »: il client li toglie.
 const QUIPS = {
   fleeOk: [
-    'Si disconnette prima che qualcuno apra un ticket a suo nome.',
-    'Ufficialmente era in ferie.',
-    'Chiude il portatile e dice «a me funziona».',
-    'Riassegna il ticket a un collega. Classico.',
-    'La VPN cade al momento giusto, per una volta.',
-    'Esce dalla porta antincendio, l\'unica senza lettore badge.'
+    'Riassegno al secondo livello e chiudo la chat.',
+    'Chiudo come «non riproducibile» e cambio piano.',
+    'Mi è caduta la VPN. Per una volta, al momento giusto.',
+    'Esco dalla porta antincendio: l\'unica senza lettore badge.',
+    'Ufficialmente sono in ferie. C\'è anche la risposta automatica.',
+    'Webcam spenta, microfono muto: io qui non ci sono mai stato.'
   ],
   fleeKo: [
-    'Il ticket torna indietro con la nota «non risolto».',
-    'Lo raggiungono in pausa caffè.',
-    'Era in videochiamata con la webcam accesa.',
-    'Escalation al responsabile. Il suo.',
-    'Il CAB ha detto no.',
-    'Ha provato a spegnere e riaccendere. Ma non era il computer il problema.'
+    'Mi hanno trovato in pausa caffè. Con la webcam accesa.',
+    'Il CAB ha respinto la mia fuga: mancava il change.'
+  ],
+  'fleeKo:lvl': [
+    'Declassato. Torno a chiedere all\'helpdesk come si stampa.',
+    'Privilegi revocati. Almeno il badge mensa funziona ancora.'
+  ],
+  'fleeKo:hw': [
+    'Mi ritirano l\'hardware. Mi lasciano l\'alimentatore, per ricordo.',
+    'Portatile sequestrato. Lavoro dal telefono, come i commerciali.'
+  ],
+  'fleeKo:sw': [
+    'Software disinstallato da remoto. Senza preavviso, come da tradizione.',
+    'Licenza revocata. Torno a lavorare in Blocco note.'
+  ],
+  'fleeKo:cr': [
+    'Credenziali bruciate. La nuova è la vecchia con un «1» in fondo.',
+    'Password compromessa. Ristampo il post-it.'
+  ],
+  'fleeKo:gd': [
+    'Gadget confiscato. Ora la scrivania sembra quella di un consulente.',
+    'Mi hanno tolto il gadget. Era l\'unica cosa che funzionava.'
+  ],
+  'fleeKo:hand': [
+    'Si è chiuso tutto senza salvare.',
+    'Il browser si è riavviato da solo. Addio quaranta schede.'
+  ],
+  'fleeKo:gearAll': [
+    'Postazione reimmaginata. Hanno resettato pure la sedia.',
+    'Mi hanno riportato alle impostazioni di fabbrica.'
+  ],
+  'fleeKo:role': [
+    'Il mio ruolo è stato «ridefinito». Nessuno sa in cosa.',
+    'Nell\'organigramma ora risulto «da definire».'
+  ],
+  'fleeKo:best': [
+    'Si sono presi il pezzo migliore. Il resto, dicono, è debito tecnico.',
+    'Hanno buon occhio: era l\'unico asset che funzionava.'
+  ],
+  'fleeKo:penalty': [
+    'Da oggi lavoro in modalità provvisoria.',
+    'Mi hanno messo in rate limit. Anche sui pensieri.'
+  ],
+  'fleeKo:wipe': [
+    'Formattato. Il backup? Era sullo stesso disco.',
+    'Ripartito da zero. Mi chiedono se sono il nuovo stagista.'
   ],
   win: [
-    'Ticket chiuso con causa principale «errore utente».',
-    'Nessuno saprà mai come. Nemmeno chi l\'ha risolto.',
-    'Documentazione prodotta: «sistemato».',
-    'Risolto alle 18:02. Lo scrive anche nella mail di recap.',
-    'Ha funzionato al primo colpo. Molto sospetto.',
-    'Chiuso con la nota «non si riproduce più».'
+    'Ticket chiuso. Causa principale: errore utente. Come sempre.',
+    'Ho spento e riacceso. Il resto è leggenda.',
+    'Funziona e non so perché. Nessuno tocchi più niente.',
+    'Risolto. Documentazione: «sistemato».',
+    'Chiuso alle 18:02. Lo scrivo in grassetto nella mail di recap.',
+    'Chiuso con nota «non si riproduce più». Incrociamo le dita.'
   ],
   audit: [
-    'Il SOC ha trovato i log. Tutti.',
-    'Convocato per un «caffè veloce» con l\'Internal Audit.',
-    'Ha lasciato impronte ovunque nel SIEM.',
-    'L\'alert era rosso e portava il suo nome.'
+    'Il SOC ha letto i log. Tutti. Anche quelli cancellati.',
+    'Convocazione per un «caffè veloce» con l\'Internal Audit.',
+    'Nel SIEM c\'è una dashboard con il suo nome.',
+    'Alert critico: assegnatario e causa sono la stessa persona.'
   ],
   sabotage: [
-    'Non è un sabotaggio, è un test di resilienza.',
-    'Lo chiama «feedback costruttivo».',
-    'Tecnicamente rientra nel perimetro del change.',
-    'Lo mette a verbale come «collaborazione tra team».',
-    'Ha agito per il bene dell\'azienda. Il suo.'
+    'Non è un sabotaggio, è un penetration test non concordato.',
+    'Lo metto a verbale come «collaborazione tra team».'
   ],
+  'sabotage:Patch mai applicata': ['La patch? In coda dal 2021, come da procedura.'],
+  'sabotage:Zero-day fresco': ['Appena sfornato. Il vendor lo scoprirà dal tuo post-mortem.'],
+  'sabotage:Movimento laterale': ['Pivot sul tuo host. Niente di personale.'],
+  'sabotage:Caffè della macchinetta': ['Offro io il caffè. Alla minaccia.'],
+  'sabotage:Energy drink alle 3 di notte': ['Energy drink alla minaccia: stanotte non dormite in due.'],
+  'sabotage:Risposta copiata da un forum': ['Ho postato la soluzione sul forum. L\'ha letta prima lei.'],
+  'sabotage:Prompt scritto bene': ['Ho scritto un prompt perfetto. Per la minaccia.'],
+  'sabotage:Chiamata al supporto del vendor': ['Il vendor ha risposto al primo squillo. Alla minaccia.'],
+  'sabotage:Screenshot come documentazione': ['Ho girato alla minaccia lo screenshot della tua configurazione.'],
   helpYes: [
-    'Spirito di squadra, a pagamento.',
-    'Collabora volentieri. La fattura arriva dopo.',
-    'Lo fa per il team. E per i tesori.'
+    'Arrivo. Il mio tempo te lo fatturo in tesori.',
+    'Ti aiuto, ma nella mail di ringraziamento voglio essere in copia.',
+    'Condivido io lo schermo. Tu non toccare niente.'
   ],
   helpNo: [
-    'Risposta: «non è di mia competenza».',
-    'Ha aperto un ticket per valutare la richiesta.',
-    'È in riunione. Da tre giorni.',
-    'Dice che ci guarda lunedì.'
+    'Non è di mia competenza. Apri un ticket.',
+    'Hai provato a spegnere e riaccendere?',
+    'Ci guardo lunedì. Non ho detto quale.',
+    'Sono in una riunione che poteva essere una mail.',
+    'Mandami una mail, così la ignoro con calma.'
   ],
   block: [
-    'Bloccata, documentata e citata in riunione.',
-    'L\'aveva messa in blacklist il giorno prima.',
-    'Il Blue Team l\'aveva vista arrivare dal primo pacchetto.'
+    'Bloccata. L\'avevo in blacklist da ieri.',
+    'Vista arrivare dal primo pacchetto. Regola già scritta.',
+    'Bloccata, loggata e citata nel report trimestrale.'
   ],
   loot: [
-    'Tra 40.000 warning trova qualcosa di utile.',
-    'Fa grep sui log e qualcosa salta fuori.',
-    'Legge i log. Nessuno lo fa mai, per questo funziona.'
+    'Quarantamila warning e una riga utile. Me la tengo.',
+    'Leggo i log. Nessuno lo fa mai, per questo funziona.',
+    'Nei log c\'è tutto. Anche una password in chiaro.',
+    'Un grep ben fatto vale più di un SIEM da sei cifre.'
   ],
   rollback: [
-    'Ripristino da snapshot: quasi tutto è tornato com\'era.',
-    'Ctrl+Z a livello aziendale.'
+    'Ctrl+Z a livello aziendale.',
+    'Ripristino dallo snapshot di ieri. Oggi non è mai successo.',
+    'Rollback riuscito. Quasi tutto è tornato com\'era.'
   ],
   gameover: [
-    'Ora ha accesso a tutto e nessuno sa come revocarglielo.',
     'Primo comando da root: cancellare i log di questa partita.',
-    'Promosso amministratore di tutto. Auguri per la reperibilità.'
+    'sudo make me a sandwich. Funziona.',
+    'Root, finalmente. Ah, quindi adesso la reperibilità è mia?',
+    'Ho accesso a tutto e nessuno sa come revocarmelo.'
   ]
 };
 

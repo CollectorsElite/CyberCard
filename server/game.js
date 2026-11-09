@@ -50,8 +50,8 @@ class Game {
     return deck.pop() || null;
   }
   discard(c) { if (c) this.disc[c.deck].push(c); }
-  quip(kind) { const a = QUIPS[kind]; return a[this.rng(a.length)]; }
-  say(kind) { const q = this.quip(kind); this.log(q, 'quip'); return q; }
+  quip(kind, key) { const a = QUIPS[kind + ':' + key] || QUIPS[kind]; return a[this.rng(a.length)]; }
+  say(kind, key) { const q = this.quip(kind, key); this.log(q, 'quip'); return q; }
   removeFromHand(p, c) { const i = p.hand.indexOf(c); if (i < 0) return false; p.hand.splice(i, 1); return true; }
   handCard(p, uid, type) {
     if (!isInt(uid)) fail('Carta non valida.');
@@ -254,26 +254,26 @@ class Game {
       if (a.side === 'f') c.fBonus += card.bonus; else c.mBonus += card.bonus;
       txt = `${p.name}: ${card.name} (+${card.bonus} ${a.side === 'f' ? 'a ' + f.name : 'alla minaccia'})`;
       this.removeFromHand(p, card); this.discard(card);
-      if (a.side === 'm' && sabot) this.sabotage(p, txt); else this.cEv(c, txt);
+      if (a.side === 'm' && sabot) this.sabotage(p, txt, card); else this.cEv(c, txt);
     } else if (card.type === 'boost') {
       const t = c.threats[c.threats.length - 1];
       t.mod += card.amt; t.trMod += card.tr;
       txt = `${p.name}: ${card.name} (${card.amt > 0 ? '+' : ''}${card.amt} alla minaccia)`;
       this.removeFromHand(p, card); this.discard(card);
-      if (card.amt > 0 && sabot) this.sabotage(p, txt); else this.cEv(c, txt);
+      if (card.amt > 0 && sabot) this.sabotage(p, txt, card); else this.cEv(c, txt);
     } else {
       const th = this.handCard(p, a.threat, 'threat');
       this.removeFromHand(p, card); this.removeFromHand(p, th); this.discard(card);
       c.threats.push({ card: th, mod: 0, trMod: 0 });
       txt = `${p.name}: Movimento laterale, entra ${th.name} (forza ${th.l}). «${th.d}»`;
-      if (sabot) this.sabotage(p, txt); else this.cEv(c, txt);
+      if (sabot) this.sabotage(p, txt, card); else this.cEv(c, txt);
     }
     this.touch(c);
   }
   cEv(c, txt, cls = '') { c.ev.push(txt); this.log(txt, cls); }
-  sabotage(p, txt) {
+  sabotage(p, txt, card) {
     this.cEv(this.combat, txt, 'sab');
-    const q = this.say('sabotage');
+    const q = this.say('sabotage', card.name);
     this.fx({ kind: 'sabotage', by: p.id, target: this.combat.fighter, text: txt, quip: q });
     this.addEsp(p);
   }
@@ -332,7 +332,7 @@ class Game {
       const need = Math.min(6, Math.max(2, (this.isRole(p, 'sys') ? 4 : 5) - t.card.flee));
       const roll = 1 + this.rng(6), ok = roll >= need;
       this.log(`${p.name} tenta la fuga da ${t.card.name}: ${roll} (serve ${need}+), ${ok ? 'scappa' : 'preso'}.`, ok ? '' : 'bad');
-      const q = this.say(ok ? 'fleeOk' : 'fleeKo');
+      const q = this.say(ok ? 'fleeOk' : 'fleeKo', t.card.bad[0].s || t.card.bad[0].k);
       this.fx({ kind: 'roll', pid: p.id, threat: t.card.name, roll, need, ok, bad: ok ? '' : this.badText(t.card.bad), quip: q });
       if (!ok) this.applyBad(p, t.card.bad);
     }
@@ -356,8 +356,8 @@ class Game {
     for (let i = share; i < tr; i++) { const x = this.draw('A'); if (x) { f.hand.push(x); gotF.push(x.name); } }
     f.level = Math.min(WIN_LEVEL, f.level + lv);
     this.log(`${f.name} neutralizza ${this.threatNames(c)}: +${lv} ${pl(lv, 'livello', 'livelli')}, ${tr} ${pl(tr, 'tesoro', 'tesori')}.`, 'good');
-    if (h) this.log(`${h.name} incassa ${share} ${pl(share, 'tesoro', 'tesori')} per l'aiuto.`);
     const q = f.level >= WIN_LEVEL ? '' : this.say('win');
+    if (h) this.log(`${h.name} incassa ${share} ${pl(share, 'tesoro', 'tesori')} per l'aiuto.`);
     this.fx({ kind: 'win', pid: f.id, lv, level: f.level, quip: q });
     if (gotF.length) this.fx({ kind: 'drawn', to: f.id, cards: gotF });
     if (gotH.length) this.fx({ kind: 'drawn', to: h.id, cards: gotH });

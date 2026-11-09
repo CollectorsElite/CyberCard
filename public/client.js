@@ -117,22 +117,22 @@
     S.lastFx = Math.max(S.lastFx, maxI);
   }
   function fxToast(e) {
-    const me = S.you;
+    const me = S.you, q = e.quip ? ' «' + e.quip + '»' : '';
     switch (e.kind) {
       case 'roll':
-        if (e.pid === me) toast(`Fuga da ${e.threat}: dado ${e.roll} (serviva ${e.need}+). ${e.ok ? 'Ti disconnetti in tempo.' : 'Ti prende: ' + e.bad + '.'} ${e.quip || ''}`, e.ok ? 'good' : 'bad', 8000);
+        if (e.pid === me) toast(`Fuga da ${e.threat}: dado ${e.roll} (serviva ${e.need}+). ${e.ok ? 'Ti disconnetti in tempo.' : 'Ti prende: ' + e.bad + '.'}${q}`, e.ok ? 'good' : 'bad', 8000);
         else toast(`${name(e.pid)} tenta la fuga da ${e.threat}: ${e.roll}, ${e.ok ? 'scappa' : 'preso'}.`);
         break;
-      case 'sabotage': if (e.target === me) toast(`Sabotaggio: ${e.text}. ${e.quip || ''}`, 'bad', 7000); break;
-      case 'helpNo': if (e.to === me) toast(`${name(e.by)} rifiuta. ${e.quip || ''}`, 'warn'); break;
+      case 'sabotage': if (e.target === me) toast(`Sabotaggio: ${e.text}.${q}`, 'bad', 7000); break;
+      case 'helpNo': if (e.to === me) toast(`${name(e.by)} rifiuta.${q}`, 'warn'); break;
       case 'curse':
         if (e.target === me) toast(`${name(e.by)} ti gioca «${e.card}»: ${e.text}. «${e.d || ''}»`, 'bad', 8000);
         else if (e.by !== me) toast(`${name(e.by)} gioca «${e.card}» su ${name(e.target)}.`);
         break;
-      case 'audit': toast(e.pid === me ? `Audit del SOC: troppe tracce, perdi 1 livello. ${e.quip || ''}` : `Audit del SOC su ${name(e.pid)}. ${e.quip || ''}`, e.pid === me ? 'bad' : 'warn', 7000); break;
-      case 'win': if (e.pid === me) toast(`Minaccia neutralizzata: sei a livello ${e.level}.${e.quip ? ' ' + e.quip : ''}`, 'good', 7000); break;
+      case 'audit': toast(e.pid === me ? `Audit del SOC: troppe tracce, perdi 1 livello.${q}` : `Audit del SOC su ${name(e.pid)}.${q}`, e.pid === me ? 'bad' : 'warn', 7000); break;
+      case 'win': if (e.pid === me) toast(`Minaccia neutralizzata: sei a livello ${e.level}.${q}`, 'good', 7000); break;
       case 'drawn': toast(`Peschi: ${e.cards.join(', ')}.`, 'good', 6000); break;
-      case 'gameover': toast(`${e.winner === me ? 'Hai ottenuto root. Hai vinto.' : name(e.winner) + ' ha ottenuto root.'} ${e.quip || ''}`, e.winner === me ? 'good' : 'warn', 10000); break;
+      case 'gameover': toast(`${e.winner === me ? 'Hai ottenuto root. Hai vinto.' : name(e.winner) + ' ha ottenuto root.'}${q}`, e.winner === me ? 'good' : 'warn', 10000); break;
     }
   }
 

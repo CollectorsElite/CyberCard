@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-const { buildDecks } = require('../server/cards');
+const { buildDecks, QUIPS } = require('../server/cards');
 
 const root = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(root, 'public', 'client.js'), 'utf8');
@@ -15,6 +15,13 @@ let id = 0;
 const { T, A } = buildDecks(() => ++id, x => x);
 const missing = [...new Set([...T, ...A].map(artSlug))].filter(s => !fs.existsSync(path.join(root, 'art', 'cards', s + '.jpg')));
 assert.deepStrictEqual(missing, [], 'illustrazioni mancanti: ' + missing.join(', '));
+
+// Battute dei fumetti: ogni carta da sabotaggio e ogni effetto di minaccia ha la sua.
+const keys = [...T, ...A].flatMap(c => c.type === 'threat' ? ['fleeKo:' + (c.bad[0].s || c.bad[0].k)]
+  : (c.type === 'oneshot' && !c.escape) || c.type === 'lateral' || (c.type === 'boost' && c.amt > 0) ? ['sabotage:' + c.name] : []);
+const noQuip = [...new Set(keys)].filter(k => !QUIPS[k]);
+assert.deepStrictEqual(noQuip, [], 'battute mancanti: ' + noQuip.join(', '));
+for (const q of Object.values(QUIPS).flat()) assert(!/^«|»$/.test(q), 'il fumetto taglierebbe le virgolette: ' + q);
 
 const docker = fs.readFileSync(path.join(root, 'Dockerfile'), 'utf8');
 for (const d of ['art/cards', 'art/board']) assert(docker.includes(`COPY ${d} `), `il Dockerfile non copia ${d}: in produzione le immagini sarebbero 404`);
