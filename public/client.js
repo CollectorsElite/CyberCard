@@ -286,8 +286,8 @@
     return `<div id="board">
       <div class="board-bar">
         <div class="piles" aria-label="Mazzi">
-          <div class="pile t"><span>Ticket</span><b>${v.deck.T}</b></div>
-          <div class="pile a"><span>Asset</span><b>${v.deck.A}</b></div>
+          <div class="pile t" title="Mazzo Ticket" aria-label="Mazzo Ticket: ${v.deck.T} carte"><b>${v.deck.T}</b></div>
+          <div class="pile a" title="Mazzo Asset" aria-label="Mazzo Asset: ${v.deck.A} carte"><b>${v.deck.A}</b></div>
         </div>
         <span class="clock${(S.deadlineAt - Date.now()) < 15000 ? ' urgent' : ''}" data-cd="main" aria-label="Tempo rimasto">${mmss(S.deadlineAt - Date.now())}</span>
       </div>

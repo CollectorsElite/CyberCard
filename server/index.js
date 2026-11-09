@@ -129,7 +129,7 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  const board = url.match(/^\/board\/(felt|back-ticket|back-asset)\.jpg$/);
+  const board = url.match(/^\/board\/(felt|back-ticket|back-asset|logo)\.jpg$/);
   if (board) {
     const fp = path.join(BOARD, board[1] + '.jpg');
     if (!fp.startsWith(BOARD)) { res.writeHead(404); return res.end(); }
