@@ -1,0 +1,17 @@
+{
+  "name": "escalation-online",
+  "version": "1.0.0",
+  "description": "ESCALATION: card game multiplayer di privilege escalation per gente di IT",
+  "main": "server/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node test/sim.js 100 && node test/lifecycle.js && node test/admin.js && node test/ws.js && node test/art.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.22.2"
+  }
+}

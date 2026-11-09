@@ -1,0 +1,597 @@
+[
+  {
+    "slug": "threat-popup-riavvia-per-aggiornare",
+    "color": "red",
+    "name": "Popup «riavvia per aggiornare»",
+    "text": "Rimandato 47 volte. Oggi parte da solo, durante la demo al cliente.",
+    "stars": 1
+  },
+  {
+    "slug": "threat-password-su-un-post-it",
+    "color": "red",
+    "name": "Password su un post-it",
+    "text": "Angolo in basso a sinistra del monitor. Come sempre.",
+    "stars": 1
+  },
+  {
+    "slug": "threat-banner-cookie-infinito",
+    "color": "red",
+    "name": "Banner cookie infinito",
+    "text": "«Accetta tutti.» Non c'è «rifiuta». C'è solo «gestisci» che riporta ad «accetta».",
+    "stars": 1
+  },
+  {
+    "slug": "threat-stagista-con-privilegi-admin",
+    "color": "red",
+    "name": "Stagista con privilegi admin",
+    "text": "Gliel'hanno dati «per fare prima».",
+    "stars": 1
+  },
+  {
+    "slug": "threat-certificato-ssl-scaduto",
+    "color": "red",
+    "name": "Certificato SSL scaduto",
+    "text": "Scaduto ieri. Il promemoria arrivava a chi si è dimesso.",
+    "stars": 1
+  },
+  {
+    "slug": "threat-stampante-di-rete-senziente",
+    "color": "red",
+    "name": "Stampante di rete senziente",
+    "text": "Ha un IP pubblico e un conto in sospeso con te.",
+    "stars": 1
+  },
+  {
+    "slug": "threat-shared-mailbox-orfana",
+    "color": "red",
+    "name": "Shared mailbox orfana",
+    "text": "Nessun owner. Ventimila unread. Qualcuno risponde ancora «cordiali saluti».",
+    "stars": 1
+  },
+  {
+    "slug": "threat-wi-fi-ospiti-senza-password",
+    "color": "red",
+    "name": "Wi-Fi ospiti senza password",
+    "text": "SSID: «Azienda_Guest». Password: nessuna. Banda: tutta.",
+    "stars": 2
+  },
+  {
+    "slug": "threat-riunione-che-poteva-essere-una-mail",
+    "color": "red",
+    "name": "Riunione che poteva essere una mail",
+    "text": "Novanta minuti, nessun ordine del giorno, tre «ci aggiorniamo».",
+    "stars": 2
+  },
+  {
+    "slug": "threat-macro-excel-del-2003",
+    "color": "red",
+    "name": "Macro Excel del 2003",
+    "text": "Il file si chiama FINALE_def_v7_usaquesta_NONTOCCARE.xls.",
+    "stars": 2
+  },
+  {
+    "slug": "threat-channel-alle-18-01",
+    "color": "red",
+    "name": "@channel alle 18:01",
+    "text": "«Scusate il disturbo.» Disturbo accettato da 400 persone.",
+    "stars": 2
+  },
+  {
+    "slug": "threat-fax-ancora-collegato-in-rete",
+    "color": "red",
+    "name": "Fax ancora collegato in rete",
+    "text": "Nessuno lo usa dal 2009. È ancora acceso.",
+    "stars": 2
+  },
+  {
+    "slug": "threat-utente-che-clicca-tutto",
+    "color": "red",
+    "name": "Utente che clicca tutto",
+    "text": "Ha vinto un telefono. Per la terza volta questa settimana.",
+    "stars": 2
+  },
+  {
+    "slug": "threat-bug-che-sparisce-in-debug",
+    "color": "red",
+    "name": "Bug che sparisce in debug",
+    "text": "Se lo guardi non c'è. Se vai in ferie sì.",
+    "stars": 2
+  },
+  {
+    "slug": "threat-condivisione-schermo-col-tab-sbagliato",
+    "color": "red",
+    "name": "Condivisione schermo col tab sbagliato",
+    "text": "La slide era pronta. La chat privata no.",
+    "stars": 2
+  },
+  {
+    "slug": "threat-captcha-infinito",
+    "color": "red",
+    "name": "Captcha infinito",
+    "text": "Seleziona tutti i semafori. E ancora. E ancora.",
+    "stars": 3
+  },
+  {
+    "slug": "threat-vpn-che-cade-solo-a-te",
+    "color": "red",
+    "name": "VPN che cade solo a te",
+    "text": "Agli altri funziona. Al supporto «non riusciamo a riprodurre».",
+    "stars": 3
+  },
+  {
+    "slug": "threat-ticket-in-waiting-for-customer-dal-2022",
+    "color": "red",
+    "name": "Ticket in Waiting for customer dal 2022",
+    "text": "Il customer sei tu. Non lo sapevi.",
+    "stars": 3
+  },
+  {
+    "slug": "threat-cryptominer-nel-tostapane",
+    "color": "red",
+    "name": "Cryptominer nel tostapane",
+    "text": "Il pane resta freddo, la bolletta no.",
+    "stars": 3
+  },
+  {
+    "slug": "threat-shadow-it-del-marketing",
+    "color": "red",
+    "name": "Shadow IT del Marketing",
+    "text": "Sette SaaS, una carta aziendale, zero DPA. Lo scoprirete dal Garante.",
+    "stars": 3
+  },
+  {
+    "slug": "threat-llm-che-allucina-in-produzione",
+    "color": "red",
+    "name": "LLM che allucina in produzione",
+    "text": "Ha inventato una policy. Ora è ufficiale. È anche sbagliata.",
+    "stars": 3
+  },
+  {
+    "slug": "threat-excel-di-dati-personali-in-rispondi-a-tutti",
+    "color": "red",
+    "name": "Excel di dati personali in «Rispondi a tutti»",
+    "text": "Hai 72 ore per notificare. Ne sono già passate 71.",
+    "stars": 4
+  },
+  {
+    "slug": "threat-consulente-del-e-un-attimo",
+    "color": "red",
+    "name": "Consulente del «è un attimo»",
+    "text": "Fattura a ore. Gli attimi sono tanti.",
+    "stars": 4
+  },
+  {
+    "slug": "threat-repo-pubblico-con-il-env",
+    "color": "red",
+    "name": "Repo pubblico con il .env",
+    "text": "Star: 2. Fork: 1. Secrets: tutti. Commit: «fix typo».",
+    "stars": 4
+  },
+  {
+    "slug": "threat-botnet-di-frigoriferi",
+    "color": "red",
+    "name": "Botnet di frigoriferi",
+    "text": "Ventimila frigoriferi smart, tutti contro di te.",
+    "stars": 4
+  },
+  {
+    "slug": "threat-backup-mai-testato",
+    "color": "red",
+    "name": "Backup mai testato",
+    "text": "Esiste. Funziona? Lo scopri adesso. Ultimo restore riuscito: mai.",
+    "stars": 4
+  },
+  {
+    "slug": "threat-cluster-kubernetes-senza-owner",
+    "color": "red",
+    "name": "Cluster Kubernetes senza owner",
+    "text": "Gira da tre anni. Il YAML è firmato «tmp».",
+    "stars": 4
+  },
+  {
+    "slug": "threat-rilascio-in-produzione-di-venerdi",
+    "color": "red",
+    "name": "Rilascio in produzione di venerdì",
+    "text": "«È una modifica piccola.» Firmato: nessuno. Rollback: non previsto.",
+    "stars": 4
+  },
+  {
+    "slug": "threat-fornitore-unico-certificato",
+    "color": "red",
+    "name": "Fornitore unico «certificato»",
+    "text": "Il certificato è un PDF del 2017. Lo scope è la macchinetta del caffè.",
+    "stars": 4
+  },
+  {
+    "slug": "threat-email-urgente-senza-priorita",
+    "color": "red",
+    "name": "Email «URGENTE» senza priorità",
+    "text": "Oggetto in maiuscolo. Corpo: «quando puoi». Allegato: 40 MB.",
+    "stars": 4
+  },
+  {
+    "slug": "threat-auditor-a-fine-trimestre",
+    "color": "red",
+    "name": "Auditor a fine trimestre",
+    "text": "Vuole tutte le evidenze. Entro domani. In PDF firmato digitalmente.",
+    "stars": 5
+  },
+  {
+    "slug": "threat-richiesta-gdpr-del-lunedi-mattina",
+    "color": "red",
+    "name": "Richiesta GDPR del lunedì mattina",
+    "text": "Vuole «tutti i suoi dati». Entro 30 giorni. Sono le 9:12.",
+    "stars": 5
+  },
+  {
+    "slug": "threat-ransomware-con-assistenza-clienti",
+    "color": "red",
+    "name": "Ransomware con assistenza clienti",
+    "text": "Chat h24, FAQ chiare, sconto se paghi entro 48 ore.",
+    "stars": 5
+  },
+  {
+    "slug": "threat-mainframe-cobol-immortale",
+    "color": "red",
+    "name": "Mainframe COBOL immortale",
+    "text": "È più vecchio del tuo capo e gli sopravviverà.",
+    "stars": 5
+  },
+  {
+    "slug": "threat-phishing-che-ha-fregato-il-cfo",
+    "color": "red",
+    "name": "Phishing che ha fregato il CFO",
+    "text": "Il bonifico è partito. La mail era quasi perfetta. Il CFO «aveva fretta».",
+    "stars": 5
+  },
+  {
+    "slug": "threat-insider-con-badge-e-rancore",
+    "color": "red",
+    "name": "Insider con badge e rancore",
+    "text": "Conosce le password. Le ha scelte lui.",
+    "stars": 5
+  },
+  {
+    "slug": "threat-apt-finanziata-da-uno-stato",
+    "color": "red",
+    "name": "APT finanziata da uno Stato",
+    "text": "Paziente, ben pagata, nella tua rete dal 2019. Ha anche il badge mensa.",
+    "stars": 5
+  },
+  {
+    "slug": "threat-zero-day-del-venerdi-alle-17-59",
+    "color": "red",
+    "name": "Zero-day del venerdì alle 17:59",
+    "text": "Formattazione completa. Buon weekend.",
+    "stars": 5
+  },
+  {
+    "slug": "curse-reset-password-obbligatorio",
+    "color": "purple",
+    "name": "Reset password obbligatorio",
+    "text": "Dodici caratteri, un simbolo, nessuna delle ultime 24. Diventa «Estate2025!!».",
+    "stars": 2
+  },
+  {
+    "slug": "curse-laptop-ritirato-dall-it",
+    "color": "purple",
+    "name": "Laptop ritirato dall'IT",
+    "text": "«Te lo ridiamo martedì.» Non dicono quale.",
+    "stars": 2
+  },
+  {
+    "slug": "curse-licenza-scaduta",
+    "color": "purple",
+    "name": "Licenza scaduta",
+    "text": "Il rinnovo era in approvazione dal CFO. Dal 2023.",
+    "stars": 2
+  },
+  {
+    "slug": "curse-credenziali-in-un-data-leak",
+    "color": "purple",
+    "name": "Credenziali in un data leak",
+    "text": "Ora le conosce mezzo internet.",
+    "stars": 2
+  },
+  {
+    "slug": "curse-riorganizzazione-aziendale",
+    "color": "purple",
+    "name": "Riorganizzazione aziendale",
+    "text": "Il tuo ruolo non esiste più. Nemmeno il tuo ufficio.",
+    "stars": 3
+  },
+  {
+    "slug": "curse-in-copia-su-140-mail",
+    "color": "purple",
+    "name": "In copia su 140 mail",
+    "text": "Tutte con «URGENTE» nell'oggetto.",
+    "stars": 2
+  },
+  {
+    "slug": "curse-corso-obbligatorio-di-sicurezza",
+    "color": "purple",
+    "name": "Corso obbligatorio di sicurezza",
+    "text": "Quarantacinque minuti di video. Il quiz finale si passa tirando a caso.",
+    "stars": 2
+  },
+  {
+    "slug": "curse-migrazione-al-nuovo-gestionale",
+    "color": "purple",
+    "name": "Migrazione al nuovo gestionale",
+    "text": "Tutto come prima, ma con il triplo dei clic.",
+    "stars": 2
+  },
+  {
+    "slug": "curse-revisione-degli-accessi",
+    "color": "purple",
+    "name": "Revisione degli accessi",
+    "text": "Qualcuno ha finalmente letto i log.",
+    "stars": 3
+  },
+  {
+    "slug": "curse-policy-di-gruppo-restrittiva",
+    "color": "purple",
+    "name": "Policy di gruppo restrittiva",
+    "text": "Non puoi installare niente. Nemmeno il buonumore.",
+    "stars": 3
+  },
+  {
+    "slug": "curse-mfa-sul-telefono-vecchio",
+    "color": "purple",
+    "name": "MFA sul telefono vecchio",
+    "text": "L'SMS arriva su un Nokia in un cassetto. In un altro ufficio.",
+    "stars": 2
+  },
+  {
+    "slug": "curse-hot-desk-senza-monitor",
+    "color": "purple",
+    "name": "Hot desk senza monitor",
+    "text": "Hai un posto. Teoricamente. Il monitor no.",
+    "stars": 2
+  },
+  {
+    "slug": "role-red",
+    "color": "blue",
+    "name": "Red Teamer",
+    "text": "Vinci anche i pareggi in combattimento.",
+    "stars": 4
+  },
+  {
+    "slug": "role-sys",
+    "color": "blue",
+    "name": "Sysadmin",
+    "text": "La fuga riesce con 4 o più invece che con 5.",
+    "stars": 4
+  },
+  {
+    "slug": "role-blue",
+    "color": "blue",
+    "name": "Blue Teamer",
+    "text": "La prima Sfiga che ti colpisce in ogni giro viene bloccata.",
+    "stars": 4
+  },
+  {
+    "slug": "role-social",
+    "color": "blue",
+    "name": "Ingegnere sociale",
+    "text": "I tuoi sabotaggi non aumentano l'Esposizione.",
+    "stars": 4
+  },
+  {
+    "slug": "boost-patch-mai-applicata",
+    "color": "gold",
+    "name": "Patch mai applicata",
+    "text": "In coda dal 2021.",
+    "stars": 3
+  },
+  {
+    "slug": "boost-zero-day-fresco",
+    "color": "gold",
+    "name": "Zero-day fresco",
+    "text": "Appena uscito da un forum che non nomineremo.",
+    "stars": 4
+  },
+  {
+    "slug": "boost-versione-beta",
+    "color": "gold",
+    "name": "Versione beta",
+    "text": "Si pianta da sola. Più debole, ma rende meno.",
+    "stars": 2
+  },
+  {
+    "slug": "lateral-movimento",
+    "color": "purple",
+    "name": "Movimento laterale",
+    "text": "L'attaccante si sposta. Su di te.",
+    "stars": 3
+  },
+  {
+    "slug": "gear-hw-laptop-pieno-di-adesivi",
+    "color": "gold",
+    "name": "Laptop pieno di adesivi",
+    "text": "Uno dice «I ♥ sudo».",
+    "stars": 1
+  },
+  {
+    "slug": "gear-hw-raspberry-pi-nel-controsoffitto",
+    "color": "gold",
+    "name": "Raspberry Pi nel controsoffitto",
+    "text": "Nessuno sa chi l'ha messo lì.",
+    "stars": 2
+  },
+  {
+    "slug": "gear-hw-workstation-con-gpu-da-mutuo",
+    "color": "gold",
+    "name": "Workstation con GPU da mutuo",
+    "text": "D'inverno scalda l'ufficio.",
+    "stars": 3
+  },
+  {
+    "slug": "gear-hw-chiavetta-usb-trovata-nel-parcheggio",
+    "color": "gold",
+    "name": "Chiavetta USB trovata nel parcheggio",
+    "text": "Cosa potrebbe andare storto?",
+    "stars": 2
+  },
+  {
+    "slug": "gear-sw-script-bash-non-commentato",
+    "color": "gold",
+    "name": "Script Bash non commentato",
+    "text": "Funziona. Nessuno sa perché.",
+    "stars": 1
+  },
+  {
+    "slug": "gear-sw-regex-che-capisci-solo-tu",
+    "color": "gold",
+    "name": "Regex che capisci solo tu",
+    "text": "Scritta da te, letta da nessuno.",
+    "stars": 2
+  },
+  {
+    "slug": "gear-sw-firewall-configurato-a-mano",
+    "color": "gold",
+    "name": "Firewall configurato a mano",
+    "text": "Ottocento regole, tre in conflitto.",
+    "stars": 2
+  },
+  {
+    "slug": "gear-sw-edr-in-modalita-paranoia",
+    "color": "gold",
+    "name": "EDR in modalità paranoia",
+    "text": "Blocca anche te. Soprattutto te.",
+    "stars": 3
+  },
+  {
+    "slug": "gear-cr-password-estate2024",
+    "color": "gold",
+    "name": "Password «Estate2024!»",
+    "text": "Valida fino alla prossima estate.",
+    "stars": 1
+  },
+  {
+    "slug": "gear-cr-token-di-servizio-mai-ruotato",
+    "color": "gold",
+    "name": "Token di servizio mai ruotato",
+    "text": "L'ha creato il tuo predecessore.",
+    "stars": 2
+  },
+  {
+    "slug": "gear-cr-domain-admin-dimenticato",
+    "color": "gold",
+    "name": "Domain admin dimenticato",
+    "text": "Ultimo accesso: mai. Ultimo audit: mai.",
+    "stars": 3
+  },
+  {
+    "slug": "gear-gd-tazza-sulla-mia-macchina-va",
+    "color": "gold",
+    "name": "Tazza «Sulla mia macchina va»",
+    "text": "Prova inconfutabile.",
+    "stars": 1
+  },
+  {
+    "slug": "gear-gd-cuffie-antirumore",
+    "color": "gold",
+    "name": "Cuffie antirumore",
+    "text": "Il segnale universale per «non ora».",
+    "stars": 2
+  },
+  {
+    "slug": "gear-gd-badge-clonato",
+    "color": "gold",
+    "name": "Badge clonato",
+    "text": "Apre anche la sala server.",
+    "stars": 2
+  },
+  {
+    "slug": "gear-gd-felpa-col-cappuccio-d-ordinanza",
+    "color": "gold",
+    "name": "Felpa col cappuccio d'ordinanza",
+    "text": "Per un Red Teamer vale +2 in più.",
+    "stars": 1
+  },
+  {
+    "slug": "gear-gd-tastiera-meccanica-da-open-space",
+    "color": "gold",
+    "name": "Tastiera meccanica da open space",
+    "text": "Ogni tasto è un annuncio pubblico.",
+    "stars": 1
+  },
+  {
+    "slug": "gear-gd-torre-di-post-it-todo",
+    "color": "gold",
+    "name": "Torre di post-it «TODO»",
+    "text": "Il debito tecnico in forma cartacea.",
+    "stars": 1
+  },
+  {
+    "slug": "oneshot-caffe-della-macchinetta",
+    "color": "blue",
+    "name": "Caffè della macchinetta",
+    "text": "Sa di plastica e di speranza.",
+    "stars": 1
+  },
+  {
+    "slug": "oneshot-energy-drink-alle-3-di-notte",
+    "color": "blue",
+    "name": "Energy drink alle 3 di notte",
+    "text": "Il cuore ringrazia. Più tardi.",
+    "stars": 2
+  },
+  {
+    "slug": "oneshot-risposta-copiata-da-un-forum",
+    "color": "blue",
+    "name": "Risposta copiata da un forum",
+    "text": "Accettata nel 2012, ancora valida.",
+    "stars": 2
+  },
+  {
+    "slug": "oneshot-prompt-scritto-bene",
+    "color": "blue",
+    "name": "Prompt scritto bene",
+    "text": "Contesto, vincoli, esempi. Funziona.",
+    "stars": 3
+  },
+  {
+    "slug": "oneshot-chiamata-al-supporto-del-vendor",
+    "color": "blue",
+    "name": "Chiamata al supporto del vendor",
+    "text": "Dopo 40 minuti di musica d'attesa.",
+    "stars": 4
+  },
+  {
+    "slug": "oneshot-screenshot-come-documentazione",
+    "color": "blue",
+    "name": "Screenshot come documentazione",
+    "text": "Pixelati, tagliati, perfetti. Per chi c'era.",
+    "stars": 1
+  },
+  {
+    "slug": "oneshot-rollback",
+    "color": "blue",
+    "name": "Rollback",
+    "text": "Torni allo stato di prima. Quasi.",
+    "stars": 3
+  },
+  {
+    "slug": "level-certificazione-appena-presa",
+    "color": "gold",
+    "name": "Certificazione appena presa",
+    "text": "È costata quanto un monolocale.",
+    "stars": 3
+  },
+  {
+    "slug": "level-hai-sistemato-la-stampante-del-ceo",
+    "color": "gold",
+    "name": "Hai sistemato la stampante del CEO",
+    "text": "Ora ti chiamano «il genio».",
+    "stars": 3
+  },
+  {
+    "slug": "level-promozione-per-anzianita",
+    "color": "gold",
+    "name": "Promozione per anzianità",
+    "text": "Nessuno sa cosa fai, ma lo fai da tanto.",
+    "stars": 3
+  }
+]
