@@ -16,6 +16,8 @@ const { T, A } = buildDecks(() => ++id, x => x);
 const missing = [...new Set([...T, ...A].map(artSlug))].filter(s => !fs.existsSync(path.join(root, 'art', 'cards', s + '.jpg')));
 assert.deepStrictEqual(missing, [], 'illustrazioni mancanti: ' + missing.join(', '));
 
+const docker = fs.readFileSync(path.join(root, 'Dockerfile'), 'utf8');
+for (const d of ['art/cards', 'art/board']) assert(docker.includes(`COPY ${d} `), `il Dockerfile non copia ${d}: in produzione le immagini sarebbero 404`);
 for (const f of ['felt', 'back-ticket', 'back-asset']) assert(fs.existsSync(path.join(root, 'art', 'board', f + '.jpg')), 'manca art/board/' + f + '.jpg');
 
 // La CSP (style-src 'self') blocca gli attributi style inline: il browser li ignora in silenzio.
