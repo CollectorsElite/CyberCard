@@ -46,6 +46,13 @@ header .sp{flex:1}
 .ol .lvl{font:700 22px var(--mono)}
 .tt{font:500 10px var(--mono);color:var(--green)}
 .om{font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ostats{display:flex;gap:10px;margin:4px 0}
+.ostats>span{display:flex;flex-direction:column;gap:1px}
+.ostats small{font:700 8.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.ostats b{font:700 15px/1.1 var(--mono)}
+.orole{font-size:11.5px;color:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp .minis .card.mini,.oslot{flex:0 0 28px;width:28px;height:40px}
+.oslot{display:flex;align-items:center;justify-content:center;border:2px dashed var(--line);border-radius:4px;font:700 8px var(--mono);color:#5f6e80}
 .st{display:block;height:12px;font:700 9px/12px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--mute)}
 .st.wait{color:var(--amber)}.st.ok{color:var(--green)}.st.fight{color:var(--red)}.st.help{color:var(--blue)}
 .esp{display:inline-flex;gap:3px;vertical-align:middle}
@@ -116,6 +123,10 @@ header .sp{flex:1}
 .hand{display:flex;gap:8px;overflow-x:auto;padding:6px 0 4px;scroll-snap-type:x proximity}
 .card{--k:var(--mute);flex:0 0 92px;width:92px;height:132px;border:0;padding:0;background:transparent;border-radius:8px;cursor:pointer;scroll-snap-align:start;overflow:hidden;box-shadow:2px 3px 0 #000}
 .card .face{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.card{position:relative}
+.card .tag{position:absolute;top:4px;left:4px;min-width:24px;padding:0 5px;border-radius:999px;background:var(--ink);color:var(--paper);border:2px solid var(--paper);font:700 13px/18px var(--mono);text-align:center;pointer-events:none}
+.card.k-threat .tag{background:var(--red)}
+.card.mini .tag{display:none}
 .card.mini{flex:0 0 36px;width:36px;height:52px;border-radius:4px}
 .card.lg{flex-basis:150px;height:200px}
 img.face.mini{width:36px;height:52px;object-fit:cover;border-radius:4px}
@@ -152,8 +163,17 @@ img.zoom{width:min(100%,320px);display:block;margin:0 auto 8px;border-radius:12p
 .mbody p{margin:6px 0}
 .mbody .warn{color:var(--red);font-weight:600}
 .mbtns{display:flex;flex-direction:column;gap:6px;margin-top:12px}
-.detail .flav{color:var(--mute);font-style:italic}
-.detail .rule{font-family:var(--mono);font-size:12px;margin:4px 0}
+.kind{font:700 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin:6px 0 2px}
+.fx{list-style:none;padding:0;margin:4px 0;font:600 15px/1.4 var(--sans);color:var(--text)}
+.fx li{margin:3px 0}
+.bad{font:600 14px/1.4 var(--sans);color:#ff9b94;background:rgba(240,82,74,.1);border-left:3px solid var(--red);border-radius:4px;padding:4px 8px;margin:6px 0}
+.flav{font:italic 12.5px/1.45 Georgia,"Times New Roman",serif;color:var(--mute);border-top:1px dashed var(--line);padding-top:8px;margin:10px 0 0}
+#peek{position:fixed;z-index:150;display:grid;grid-template-columns:104px 1fr;gap:10px;width:330px;background:var(--panel);border:3px solid var(--ink);border-radius:12px;box-shadow:4px 4px 0 #000;padding:10px;pointer-events:none;animation:pop .12s}
+#peek img{width:104px;border-radius:8px;display:block}
+#peek b{font-size:14px}
+#peek .fx{font-size:13.5px}
+#peek .bad{font-size:12.5px}
+#peek .flav{font-size:11.5px}
 .stepper{display:flex;align-items:center;gap:10px;margin:8px 0}
 .stepper b{font:700 24px var(--mono);min-width:34px;text-align:center}
 .stepper button{width:44px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);font-size:20px;cursor:pointer}
@@ -212,18 +232,24 @@ img.zoom{width:min(100%,320px);display:block;margin:0 auto 8px;border-radius:12p
   width:92px;
   margin-left:-42px;
   transform-origin:50% 140%;
-  transition:transform .15s ease;
+  overflow:visible;
+  box-shadow:none;
 }
+.hand[data-hand-layout="fan"] .card .face,
+.hand[data-hand-layout="fan"] .card .tag{transition:transform .15s ease}
+.hand[data-hand-layout="fan"] .card .face{border-radius:8px;box-shadow:2px 3px 0 #000}
 .hand[data-hand-layout="fan"] .card:first-child{margin-left:0}
 @media (max-width:520px){
   .hand[data-hand-layout="fan"] .card{flex-basis:72px;width:72px;height:104px;margin-left:-44px}
   .hand[data-hand-layout="fan"] .card:first-child{margin-left:0}
 }
+/* Si muove solo l'immagine: l'area del pulsante resta ferma sotto il puntatore (niente sfarfallio). */
 .hand[data-hand-layout="fan"][data-n] .card.card:hover,
-.hand[data-hand-layout="fan"][data-n] .card.card:focus-visible{
-  transform:translateY(calc(-1 * var(--hand-lift))) rotate(0deg);
-  z-index:100;
-}
+.hand[data-hand-layout="fan"][data-n] .card.card:focus-visible{z-index:100}
+.hand[data-hand-layout="fan"] .card:hover .face,
+.hand[data-hand-layout="fan"] .card:focus-visible .face,
+.hand[data-hand-layout="fan"] .card:hover .tag,
+.hand[data-hand-layout="fan"] .card:focus-visible .tag{transform:translateY(calc(-1 * var(--hand-lift))) scale(1.1)}
 
 /* fan angles: data-n, no inline style (CSP style-src self) */
 .hand[data-hand-layout="fan"][data-n="1"] .card:nth-child(1){transform:rotate(0deg);z-index:1}
@@ -298,5 +324,6 @@ a.hbtn{text-decoration:none;color:inherit;display:inline-block}
 @keyframes tick{50%{filter:brightness(1.35)}}
 @media (prefers-reduced-motion:reduce){
   .bubble,.clock.urgent,.vs.l{animation:none}
-  .hand[data-hand-layout="fan"] .card,.wiki-i img{transition:none}
+  .hand[data-hand-layout="fan"] .card .face,.hand[data-hand-layout="fan"] .card .tag,.wiki-i img{transition:none}
+  #peek{animation:none}
 }

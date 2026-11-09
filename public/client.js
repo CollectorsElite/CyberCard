@@ -154,7 +154,7 @@
   }
   function cardHTML(c, opt = {}) {
     const src = '/cards/' + artSlug(c) + '.jpg';
-    return `<button type="button" class="card k-${c.type}${opt.lg ? ' lg' : ''}${opt.mini ? ' mini' : ''}${opt.sel ? ' sel' : ''}" data-uid="${c.uid}"${opt.m ? ` data-m="${opt.m}"` : ''} title="${esc(c.name)}" aria-label="${esc(c.name)}"><img class="face" src="${src}" alt=""></button>`;
+    return `<button type="button" class="card k-${c.type}${opt.lg ? ' lg' : ''}${opt.mini ? ' mini' : ''}${opt.sel ? ' sel' : ''}" data-uid="${c.uid}"${opt.m ? ` data-m="${opt.m}"` : ''} aria-label="${esc(c.name)}"><img class="face" src="${src}" alt="">${cardTag(c) ? `<span class="tag">${cardTag(c)}</span>` : ''}</button>`;
   }
   function artSlug(c) {
     const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
@@ -164,17 +164,25 @@
     if (c.type === 'lateral') return 'lateral-movimento';
     return (c.type || 'card') + '-' + slug(c.name);
   }
-  function cardDetail(c) {
-    if (!c) return '';
-    const R = [];
+  const KIND = { threat: 'Minaccia', curse: 'Sfiga', boost: 'Interferenza', lateral: 'Interferenza', role: 'Ruolo', gear: 'Asset', oneshot: 'Uso singolo', levelup: 'Carta livello' };
+  function cardTag(c) {
+    if (c.type === 'threat') return String(c.l);
+    if (c.type === 'gear' || (c.type === 'oneshot' && !c.escape)) return '+' + c.bonus;
+    if (c.type === 'boost') return (c.amt > 0 ? '+' : '') + c.amt;
+    return '';
+  }
+  // Effetto (testo grande), penalità (rosso) e battuta (corsivo piccolo): usato da scheda, wiki e anteprima.
+  function fxHTML(c) {
+    const R = []; let bad = '';
     switch (c.type) {
       case 'threat':
-        R.push(`Forza ${c.l} · ricompensa: +${c.lv} ${pl(c.lv, 'livello', 'livelli')}, ${c.tr} ${pl(c.tr, 'tesoro', 'tesori')}`, `Se non scappi: ${badText(c.bad)}`);
+        R.push(`Forza ${c.l}`, `Se vinci: +${c.lv} ${pl(c.lv, 'livello', 'livelli')} e ${c.tr} ${pl(c.tr, 'tesoro', 'tesori')}`);
+        bad = `Se non scappi: ${badText(c.bad)}`;
         if (c.vs) R.push(`+${c.vs.n} contro ${(ROLES[c.vs.role] || { name: c.vs.role }).name}`);
         if (c.flee > 0) R.push(`Più facile da cui fuggire (+${c.flee} al dado)`);
         if (c.flee < 0) R.push(`Più difficile da cui fuggire (${c.flee} al dado)`);
         break;
-      case 'curse': R.push(`Effetto: ${badText(c.bad)}`, 'Giocabile su chiunque, in qualsiasi momento. Ti costa 1 punto di Esposizione.'); break;
+      case 'curse': R.push(`Chi la subisce: ${badText(c.bad)}`, 'Giocabile su chiunque, in qualsiasi momento. Ti costa 1 punto di Esposizione.'); break;
       case 'role': R.push((ROLES[c.role] || { text: '' }).text, 'Un solo ruolo alla volta.'); break;
       case 'boost': R.push(`${c.amt > 0 ? '+' : ''}${c.amt} alla minaccia, ${c.tr > 0 ? '+' : ''}${c.tr} ${pl(Math.abs(c.tr), 'tesoro', 'tesori')}`, c.amt > 0 ? 'Sul combattimento di un altro è un sabotaggio: +1 Esposizione.' : 'Indebolisce la minaccia: nessuna Esposizione.'); break;
       case 'lateral': R.push('Durante un combattimento aggiunge una Minaccia dalla tua mano.', 'Sul combattimento di un altro è un sabotaggio: +1 Esposizione.'); break;
@@ -182,7 +190,11 @@
       case 'oneshot': R.push(c.escape ? 'Quando devi fuggire: ti sganci senza tirare il dado.' : `+${c.bonus} a una delle due parti di un combattimento qualsiasi.`, `Valore ${c.value}`); break;
       case 'levelup': R.push('+1 livello nel tuo turno, fuori dal combattimento. Non porta a 10.'); break;
     }
-    return `<div class="detail"><img class="zoom" src="/cards/${artSlug(c)}.jpg" alt="${esc(c.name)}">${R.map(r => `<p class="rule">${esc(r)}</p>`).join('')}<p class="flav">${esc(c.d || '')}</p></div>`;
+    return `<p class="kind">${KIND[c.type] || ''}</p><ul class="fx">${R.map(r => `<li>${esc(r)}</li>`).join('')}</ul>${bad ? `<p class="bad">${esc(bad)}</p>` : ''}${c.d && c.type !== 'role' ? `<p class="flav">«${esc(c.d)}»</p>` : ''}`;
+  }
+  function cardDetail(c) {
+    if (!c) return '';
+    return `<div class="detail"><img class="zoom" src="/cards/${artSlug(c)}.jpg" alt="${esc(c.name)}">${fxHTML(c)}</div>`;
   }
   const espPips = p => `<span class="esp${p.esp >= V().espMax - 1 ? ' w3' : ''}" title="Esposizione ${p.esp}/${V().espMax}">${Array.from({ length: V().espMax }, (_, i) => `<i class="${i < p.esp ? 'on' : ''}"></i>`).join('')}</span>`;
   const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -214,6 +226,7 @@
       changed = paint(scr, gameHTML(), '_k');
     }
     if (changed) {
+      hidePeek();
       const h = scr.querySelector('.hand'); if (h) h.scrollLeft = hs;
       const lg = scr.querySelector('#log'); if (lg) lg.scrollTop = ls;
       const f = scr.querySelector('#fName'); if (f && document.activeElement === document.body && !S.form.name) f.focus();
@@ -309,17 +322,13 @@
       else if (c.offer && c.offer.to === p.id) st = '<span class="st wait">valuta aiuto</span>';
       else if (c.step === 'window') st = passed(p.id) ? '<span class="st ok">passo</span>' : '<span class="st wait">decide</span>';
     } else if (v.cur === p.id && !v.over) st = '<span class="st wait">di turno</span>';
-    const off = m && !m.connected;
-    const minis = [];
-    if (p.role) minis.push(cardHTML(p.role, { mini: true }));
-    Object.values(p.gear || {}).filter(Boolean).forEach(g => minis.push(cardHTML(g, { mini: true })));
+    const off = m && !m.connected, gear = p.gear || {};
     return `<div class="opp${v.cur === p.id && !v.over ? ' active' : ''}${off ? ' off' : ''}" data-pid="${esc(p.id)}">${st}
-      <div class="on">${esc(p.name)}</div>
+      <div class="on">${esc(p.name)}${p.isBot ? ' <span class="badge bot">bot</span>' : off ? ' <span class="badge off">offline</span>' : ''}</div>
       <div class="ol"><span class="lvl">${p.level}</span><span class="tt">${esc(p.title)}</span></div>
-      <div class="om">Forza ${p.power - p.penalty} · mano ${p.handCount}</div>
-      <div class="om">${p.role ? esc(p.role.name) : 'nessun ruolo'}${p.isBot ? ' · bot' : off ? ' · offline' : ''}</div>
-      <div class="om">Esp. ${espPips(p)}</div>
-      ${minis.length ? `<div class="minis">${minis.join('')}</div>` : ''}</div>`;
+      <div class="ostats"><span><small>Forza</small><b>${p.power - p.penalty}</b></span><span><small>Carte</small><b>${p.handCount}</b></span><span><small>Esp.</small>${espPips(p)}</span></div>
+      <div class="orole">${p.role ? esc(p.role.name) : 'nessun ruolo'}</div>
+      <div class="minis">${p.role ? cardHTML(p.role, { mini: true }) : ''}${Object.keys(SLOTS).map(s => gear[s] ? cardHTML(gear[s], { mini: true }) : `<span class="oslot" title="${SLOTS[s]}: vuoto">${s.toUpperCase()}</span>`).join('')}</div></div>`;
   }
 
   function tableHTML() {
@@ -410,7 +419,7 @@
   // S.modal = { title, html(), buttons(), dismiss, valid(), onBody(el) }
   function openModal(m) {
     if (!S.modal) S.focusEl = document.activeElement;
-    S.modal = m; renderModal();
+    S.modal = m; hidePeek(); renderModal();
     const first = $('#modal button'); if (first) first.focus();
   }
   function closeModal() {
@@ -605,7 +614,7 @@
     const all = S.catalog || [], c = all[st.sel];
     if (!all.length) return '<p>Caricamento del catalogo…</p>';
     if (c) return `<button type="button" class="btn" data-m="back">← Tutte le carte</button>
-      <h4>${esc(c.name)}</h4><p class="rule">${WIKI[c.type]} · mazzo ${c.deck === 'T' ? 'Ticket' : 'Asset'} · ${c.n} ${pl(c.n, 'copia', 'copie')}</p>${cardDetail(c)}`;
+      <h4>${esc(c.name)}</h4><p class="kind">mazzo ${c.deck === 'T' ? 'Ticket' : 'Asset'} · ${c.n} ${pl(c.n, 'copia', 'copie')}</p>${cardDetail(c)}`;
     return `<div class="wiki-f">${[...new Set(Object.values(WIKI))].map(g => `<button type="button" class="btn${g === st.f ? ' primary' : ''}" data-m="f:${g}" aria-pressed="${g === st.f}">${g}</button>`).join('')}</div>
       <div class="wiki">${all.map((x, i) => WIKI[x.type] !== st.f ? '' : `<button type="button" class="wiki-i" data-m="c:${i}"><img src="/cards/${artSlug(x)}.jpg" alt="" loading="lazy"><span>${esc(x.name)}</span><small>×${x.n}</small></button>`).join('')}</div>`;
   }
@@ -645,6 +654,27 @@
         <h4>Asset e credito</h4><p>Uno slot per tipo: Hardware, Software, Credenziali, Gadget. Puoi equipaggiarti, cambiare ruolo e vendere in qualsiasi momento, ma mai durante un combattimento. Vendendo asset accumuli credito: ogni 1000 è +1 livello.</p>
         <h4>Ruoli</h4><ul>${Object.values(ROLES).map(r => `<li><b>${r.name}</b>: ${r.text}</li>`).join('')}</ul>
         <h4>Tempi e disconnessioni</h4><p>Ogni decisione ha un tempo massimo: allo scadere il server passa, chiude il turno o tira la fuga al posto tuo. Se perdi la connessione hai 15 secondi per rientrare, poi le tue mosse diventano automatiche finché non torni.</p>`}</div>`
+    });
+  }
+
+  /* ================= anteprima al passaggio del mouse ================= */
+  const peek = document.createElement('div');
+  peek.id = 'peek'; peek.className = 'hidden'; peek.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(peek);
+  const hidePeek = () => { peek.classList.add('hidden'); peek._uid = null; };
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    document.addEventListener('mouseover', e => {
+      const el = !S.modal && S.view && e.target.closest('.card[data-uid], .slot.full');
+      const c = el && (el.dataset.uid ? (V().hand.find(x => x.uid === +el.dataset.uid) || findPublic(+el.dataset.uid)) : ME().gear[el.dataset.slot]);
+      if (!c) return hidePeek();
+      if (peek._uid === c.uid) return;
+      peek._uid = c.uid;
+      peek.innerHTML = `<img src="/cards/${artSlug(c)}.jpg" alt=""><div><b>${esc(c.name)}</b>${fxHTML(c)}</div>`;
+      peek.classList.remove('hidden');
+      const r = el.getBoundingClientRect(), w = peek.offsetWidth, h = peek.offsetHeight;
+      const x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8);
+      const y = r.top - h - 14 > 8 ? r.top - h - 14 : Math.min(r.bottom + 14, innerHeight - h - 8);
+      peek.style.left = x + 'px'; peek.style.top = y + 'px';
     });
   }
 
