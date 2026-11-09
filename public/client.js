@@ -190,7 +190,7 @@
       case 'oneshot': R.push(c.escape ? 'Quando devi fuggire: ti sganci senza tirare il dado.' : `+${c.bonus} a una delle due parti di un combattimento qualsiasi.`, `Valore ${c.value}`); break;
       case 'levelup': R.push('+1 livello nel tuo turno, fuori dal combattimento. Non porta a 10.'); break;
     }
-    return `<p class="kind">${KIND[c.type] || ''}</p><ul class="fx">${R.map(r => `<li>${esc(r)}</li>`).join('')}</ul>${bad ? `<p class="bad">${esc(bad)}</p>` : ''}${c.d && c.type !== 'role' ? `<p class="flav">«${esc(c.d)}»</p>` : ''}`;
+    return `<p class="kind">${KIND[c.type] || ''}</p><ul class="fx">${R.map(r => `<li>${esc(r)}</li>`).join('')}</ul>${bad ? `<p class="pen">${esc(bad)}</p>` : ''}${c.d && c.type !== 'role' ? `<p class="flav">«${esc(c.d)}»</p>` : ''}`;
   }
   function cardDetail(c) {
     if (!c) return '';
@@ -215,6 +215,7 @@
     net.className = 'dot' + (S.online ? ' on' : '');
     net.setAttribute('aria-label', S.online ? 'Online' : 'Offline');
     $('#bLeave').classList.toggle('hidden', !S.room);
+    document.body.classList.toggle('ingame', !!(S.room && S.room.started && S.view));
     const scr = $('#screen');
     const oldHand = scr.querySelector('.hand'); const hs = oldHand ? oldHand.scrollLeft : 0;
     const logOld = scr.querySelector('#log'); const ls = logOld ? logOld.scrollTop : 0;

@@ -166,13 +166,13 @@ img.zoom{width:min(100%,320px);display:block;margin:0 auto 8px;border-radius:12p
 .kind{font:700 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin:6px 0 2px}
 .fx{list-style:none;padding:0;margin:4px 0;font:600 15px/1.4 var(--sans);color:var(--text)}
 .fx li{margin:3px 0}
-.bad{font:600 14px/1.4 var(--sans);color:#ff9b94;background:rgba(240,82,74,.1);border-left:3px solid var(--red);border-radius:4px;padding:4px 8px;margin:6px 0}
+.pen{font:600 14px/1.4 var(--sans);color:#ff9b94;background:rgba(240,82,74,.1);border-left:3px solid var(--red);border-radius:4px;padding:4px 8px;margin:6px 0}
 .flav{font:italic 12.5px/1.45 Georgia,"Times New Roman",serif;color:var(--mute);border-top:1px dashed var(--line);padding-top:8px;margin:10px 0 0}
 #peek{position:fixed;z-index:150;display:grid;grid-template-columns:104px 1fr;gap:10px;width:330px;background:var(--panel);border:3px solid var(--ink);border-radius:12px;box-shadow:4px 4px 0 #000;padding:10px;pointer-events:none;animation:pop .12s}
 #peek img{width:104px;border-radius:8px;display:block}
 #peek b{font-size:14px}
 #peek .fx{font-size:13.5px}
-#peek .bad{font-size:12.5px}
+#peek .pen{font-size:12.5px}
 #peek .flav{font-size:11.5px}
 .stepper{display:flex;align-items:center;gap:10px;margin:8px 0}
 .stepper b{font:700 24px var(--mono);min-width:34px;text-align:center}
@@ -320,6 +320,17 @@ img.zoom{width:min(100%,320px);display:block;margin:0 auto 8px;border-radius:12p
 .admin-cfg b{color:var(--text)}
 .admin-cfg .hint{display:inline;font-size:12px}
 a.hbtn{text-decoration:none;color:inherit;display:inline-block}
+/* Partita su schermo largo: tutta la larghezza, avversari in fila in alto, registro a destra. */
+@media (min-width:1000px){
+  body.ingame #app{max-width:none}
+  body.ingame #board{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"bar bar" "opps opps" "table log" "me log" "actions actions";gap:10px;align-items:start}
+  body.ingame .board-bar{grid-area:bar}
+  body.ingame #opps{grid-area:opps;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  body.ingame #table{grid-area:table;min-height:220px}
+  body.ingame #me{grid-area:me}
+  body.ingame #log{grid-area:log;align-self:stretch;max-height:none}
+  body.ingame #actions{grid-area:actions}
+}
 @keyframes pop{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes tick{50%{filter:brightness(1.35)}}
 @media (prefers-reduced-motion:reduce){
