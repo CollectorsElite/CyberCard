@@ -241,6 +241,7 @@ class Game {
     if (c.fighter !== p.id) fail('Non sei tu a combattere.');
     c.step = 'window'; this.touch(c);
     this.log(`Finestra di interferenza aperta: tutti devono dichiarare «passo».`, 'sys');
+    this.fx({ kind: 'window' });
   }
   a_play(p, a) {
     const c = this.inCombat(['prep', 'window']);
@@ -281,6 +282,8 @@ class Game {
     const c = this.inCombat(['window']);
     if (c.passes.has(p.id)) fail('Hai già passato.');
     c.passes.add(p.id);
+    this.log(`${p.name} passa.`);
+    this.fx({ kind: 'pass', pid: p.id });
     this.maybeClose();
   }
   a_askHelp(p, a) {
@@ -296,6 +299,7 @@ class Game {
     c.offerDeadline = this.now() + this.to.offer;
     if (!c.asked.includes(to.id)) c.asked.push(to.id);
     this.log(`${p.name} chiede aiuto a ${to.name} offrendo ${a.share} ${pl(a.share, 'tesoro', 'tesori')}.`);
+    this.fx({ kind: 'helpAsk', from: p.id, target: to.id, share: a.share });
   }
   a_cancelHelp(p) {
     const c = this.inCombat(['prep', 'window']);

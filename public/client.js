@@ -127,7 +127,12 @@
         if (e.pid === me) toast(`Fuga da ${e.threat}: dado ${e.roll} (serviva ${e.need}+). ${e.ok ? 'Ti disconnetti in tempo.' : 'Ti prende: ' + e.bad + '.'}${q}`, e.ok ? 'good' : 'bad', 8000);
         else toast(`${name(e.pid)} tenta la fuga da ${e.threat}: ${e.roll}, ${e.ok ? 'scappa' : 'preso'}.`);
         break;
-      case 'sabotage': if (e.target === me) toast(`Sabotaggio: ${e.text}.${q}`, 'bad', 7000); break;
+      case 'window': toast('Finestra aperta: interferisci o passa. Guarda il timer.', 'warn', 7000); break;
+      case 'pass': if (e.pid !== me) toast(`${name(e.pid)} passa.`); break;
+      case 'helpAsk':
+        if (e.target !== me) toast(`${name(e.from)} chiede aiuto a ${name(e.target)} (${e.share} tesori).`);
+        break;
+      case 'sabotage': toast(`Sabotaggio: ${e.text}.${q}`, e.target === me ? 'bad' : 'warn', 7000); break;
       case 'helpNo': if (e.to === me) toast(`${name(e.by)} rifiuta.${q}`, 'warn'); break;
       case 'curse':
         if (e.target === me) toast(`${name(e.by)} ti gioca «${e.card}»: ${e.text}. «${e.d || ''}»`, 'bad', 8000);
@@ -206,7 +211,7 @@
   const cd = kind => `<span class="cd" data-cd="${kind}">${mmss((kind === 'offer' ? S.offerAt : S.deadlineAt) - Date.now())}</span>`;
   // Confronto senza i countdown: se il contenuto non cambia non si tocca il DOM (niente tap persi).
   const stable = html => html
-    .replace(/<span class="cd" data-cd="(\w+)">[^<]*<\/span>/g, '[$1]')
+    .replace(/<span class="(?:cd|hud-cd)" data-cd="(\w+)">[^<]*<\/span>/g, '[$1]')
     .replace(/(<span class="clock"[^>]*>)[^<]*(<\/span>)/g, '$1$2');
   function paint(el, html, key) {
     const k = stable(html);
@@ -224,6 +229,8 @@
     const scr = $('#screen');
     const oldHand = scr.querySelector('.hand'); const hs = oldHand ? oldHand.scrollLeft : 0;
     const logOld = scr.querySelector('#log'); const ls = logOld ? logOld.scrollTop : 0;
+    const ae = document.activeElement;
+    const botKeep = ae && ae.dataset && ae.dataset.botid ? { id: ae.dataset.botid, v: ae.value, s: ae.selectionStart, e: ae.selectionEnd } : null;
     let changed;
     if (!S.room) { $('#hinfo').textContent = ''; changed = paint(scr, homeHTML(), '_k'); }
     else if (!S.room.started || !S.view) { $('#hinfo').textContent = 'stanza ' + S.room.code; changed = paint(scr, lobbyHTML(), '_k'); }
@@ -236,6 +243,10 @@
       const h = scr.querySelector('.hand'); if (h) h.scrollLeft = hs;
       const lg = scr.querySelector('#log'); if (lg) lg.scrollTop = ls;
       const f = scr.querySelector('#fName'); if (f && document.activeElement === document.body && !S.form.name) f.focus();
+      if (botKeep) {
+        const el = scr.querySelector(`[data-botid="${botKeep.id}"]`);
+        if (el) { el.value = botKeep.v; el.focus(); try { el.setSelectionRange(botKeep.s, botKeep.e); } catch (err) { /* ignore */ } }
+      }
     }
     if (S.modal) renderModal();
   }
@@ -253,9 +264,11 @@
 
   function lobbyHTML() {
     const r = S.room, isHost = r.host === S.you, link = location.origin + '/?r=' + r.code;
-    const lis = r.members.map(m => `<li><span class="nm">${esc(m.name)}</span>
+    const lis = r.members.map(m => `<li>
+      ${isHost && m.isBot
+        ? `<input class="botname inline" data-botid="${esc(m.id)}" maxlength="20" value="${esc(m.name)}" aria-label="Nome del bot">`
+        : `<span class="nm">${esc(m.name)}</span>`}
       ${m.id === r.host ? '<span class="badge host">host</span>' : ''}${m.isBot ? '<span class="badge bot">bot</span>' : ''}${!m.connected ? '<span class="badge off">offline</span>' : ''}${m.id === S.you ? '<span class="badge">tu</span>' : ''}
-      ${isHost && m.isBot ? `<button type="button" class="xbtn" data-do="renameBot" data-id="${esc(m.id)}">Rinomina</button>` : ''}
       ${isHost && m.id !== S.you ? `<button type="button" class="xbtn" data-do="remove" data-id="${esc(m.id)}" aria-label="Rimuovi">✕</button>` : ''}</li>`).join('');
     const n = r.members.length, ready = n >= r.min;
     const need = Math.max(0, r.min - n);
@@ -300,11 +313,16 @@
       </div>
       ${S.tut ? `<p class="tutwait">In attesa che tutti chiudano le istruzioni (${S.tut.ready}/${S.tut.total})</p>` : ''}
       <section id="opps" aria-label="Avversari">${others.map(oppHTML).join('')}</section>
-      <section id="table">${bubblesHTML()}${tableHTML()}</section>
+      <section id="table">${tickerHTML()}${bubblesHTML()}${tableHTML()}</section>
       <section id="me" class="${v.cur === S.you && !v.over ? ' active' : ''}">${meHTML(me)}</section>
       <section id="log" class="${S.logOpen ? ' open' : ''}" role="button" tabindex="0" aria-expanded="${S.logOpen ? 'true' : 'false'}" title="Tocca per espandere">${(S.logOpen ? v.log.slice().reverse() : v.log.slice(-5).reverse()).map(r => `<div class="l ${esc(r.cls)}">${esc(r.t)}</div>`).join('')}</section>
       <nav id="actions">${actionsHTML()}</nav>
     </div>`;
+  }
+  function tickerHTML() {
+    const rows = (V().log || []).filter(r => r.cls !== 'quip').slice(-4);
+    if (!rows.length) return '';
+    return `<ol class="ticker" aria-live="polite">${rows.map(r => `<li class="${esc(r.cls)}">${esc(r.t)}</li>`).join('')}</ol>`;
   }
   function bubblesHTML() {
     const v = V(), log = v.log || [];
@@ -351,13 +369,31 @@
       const mdet = c.threats.map(t => `${esc(t.card.name)}: ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`);
       if (c.mBonus) mdet.push(`bonus +${c.mBonus}`);
       let status = '';
-      if (c.step === 'prep') status = `${esc(f.name)} si prepara al combattimento · ${cd('main')}`;
-      else if (c.step === 'window') {
+      let hudK = 'COMBATTIMENTO', hudM = '';
+      if (c.step === 'prep') {
+        status = `${esc(f.name)} si prepara. Poi si apre la finestra per gli altri.`;
+        hudK = 'PREPARAZIONE'; hudM = status;
+      } else if (c.step === 'window') {
         const waiting = v.players.filter(p => !passed(p.id)).map(p => p.name);
-        status = `Finestra aperta · mancano: ${esc(waiting.join(', ') || 'nessuno')} · ${cd('main')}`;
-      } else if (c.step === 'flee') status = `${esc(f.name)} deve tentare la fuga · ${cd('main')}`;
-      if (c.offer) status += `<br>${esc(name(c.offer.from))} chiede aiuto a ${esc(name(c.offer.to))} per ${c.offer.share} ${pl(c.offer.share, 'tesoro', 'tesori')} · ${cd('offer')}`;
-      return `<div class="fight">
+        status = `Finestra aperta · mancano: ${esc(waiting.join(', ') || 'nessuno')}`;
+        hudK = 'FINESTRA'; hudM = passed(S.you) ? 'Hai passato. Se qualcuno gioca, dovrai decidere di nuovo.' : 'Interferisci (carta) o passa. Il timer è quello qui a destra.';
+      } else if (c.step === 'flee') {
+        status = `${esc(f.name)} deve tentare la fuga.`;
+        hudK = 'FUGA'; hudM = status;
+      }
+      if (c.offer) {
+        const ask = `${esc(name(c.offer.from))} chiede aiuto a ${esc(name(c.offer.to))} per ${c.offer.share} ${pl(c.offer.share, 'tesoro', 'tesori')}`;
+        status += `<br>${ask} · ${cd('offer')}`;
+        hudK = 'AIUTO'; hudM = ask;
+      }
+      const youNeed = v.needs.includes(S.you);
+      const hudCd = c.offer && c.offer.to === S.you ? 'offer' : 'main';
+      return `<div class="hud${youNeed ? ' need' : ''}${c.step === 'window' ? ' win' : ''}" role="status">
+        <span class="hud-k">${hudK}</span>
+        <span class="hud-m">${hudM}</span>
+        <span class="hud-cd" data-cd="${hudCd}">${mmss((hudCd === 'offer' ? S.offerAt : S.deadlineAt) - Date.now())}</span>
+      </div>
+      <div class="fight">
         <div class="zone side f"><p class="zone-lab">Chi combatte</p><div class="lab">${esc(f.name)}${h ? ' + ' + esc(h.name) : ''}</div><div class="pow">${c.fighterPower}</div><div class="det">${fdet.map(esc).join('<br>')}</div></div>
         <div class="vs ${c.winning ? 'w' : 'l'}">${c.winning ? 'VINCE' : 'PERDE'}</div>
         <div class="zone side m"><p class="zone-lab">Minacce</p><div class="lab">${c.threats.length > 1 ? 'Minacce' : 'Minaccia'}</div><div class="pow">${c.threatPower}</div><div class="cardrow">${c.threats.map(t => cardHTML(t.card)).join('')}</div><div class="det">${mdet.join('<br>')}</div></div></div>
@@ -575,7 +611,7 @@
           <p>Da solo: ${c.fighterPower} contro ${c.threatPower}. Con te: ${with_}.</p>
           <p>Ti offre <b>${c.offer.share}</b> ${pl(c.offer.share, 'tesoro', 'tesori')} su ${c.treasures}. Tu non guadagni livelli.</p>
           ${f.level + c.levels >= 10 ? '<p class="warn">Se vince, vince la partita.</p>' : ''}
-          <p class="hint">Rispondi entro ${cd('offer')}</p>`;
+          <p class="hint">Rispondi entro <span class="hud-cd" data-cd="offer">${mmss(S.offerAt - Date.now())}</span></p>`;
       },
       buttons: () => [{ label: 'Accetta', cls: 'primary', on: () => act({ type: 'answerHelp', accept: true }) }, { label: 'Rifiuta', cls: 'ghost', on: () => act({ type: 'answerHelp', accept: false }) }]
     });
@@ -746,6 +782,10 @@
     S.form[f] = f === 'code' ? e.target.value.toUpperCase() : e.target.value;
     if (f === 'name') store.set('esc-name', e.target.value);
   });
+  document.addEventListener('change', e => {
+    const id = e.target.dataset && e.target.dataset.botid;
+    if (id) send({ t: 'renameBot', id, name: e.target.value });
+  });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && S.modal && S.modal.dismiss) { closeModal(); return; }
     if (!S.modal && !tut.classList.contains('hidden')) {
@@ -756,6 +796,7 @@
     if (e.key === 'Enter' || e.key === ' ') {
       if (e.target && e.target.id === 'log') { e.preventDefault(); S.logOpen = !S.logOpen; render(); return; }
     }
+    if (e.key === 'Enter' && e.target.dataset && e.target.dataset.botid) { e.target.blur(); return; }
     if (e.key !== 'Enter' || !e.target.dataset || !e.target.dataset.f) return;
     doAction(e.target.dataset.f === 'code' ? 'join' : 'create');
   });
@@ -810,20 +851,6 @@
         S.form.bot = null;
         return send({ t: 'addBot', name });
       }
-      case 'renameBot': {
-        const m = S.room.members.find(x => x.id === el.dataset.id);
-        if (!m) return;
-        S.form.botRename = m.name;
-        const id = m.id;
-        return openModal({
-          dismiss: true, title: 'Nome del bot',
-          html: () => `<div class="field"><label for="fRen">Nome</label><input id="fRen" data-f="botRename" maxlength="20" value="${esc(S.form.botRename)}"></div>`,
-          buttons: () => [
-            { label: 'Salva', cls: 'primary', on: () => send({ t: 'renameBot', id, name: S.form.botRename }) },
-            { label: 'Annulla', cls: 'ghost' }
-          ]
-        });
-      }
       case 'remove': return send({ t: 'removeMember', id: el.dataset.id });
       case 'start': return send({ t: 'start' });
       case 'rematch': return send({ t: 'rematch' });
@@ -859,7 +886,7 @@
       if (el.classList.contains('clock') && S.tut) { el.textContent = 'pausa'; el.classList.remove('urgent'); return; }
       const left = (el.dataset.cd === 'offer' ? S.offerAt : S.deadlineAt) - Date.now();
       el.textContent = mmss(left);
-      if (el.classList.contains('clock')) el.classList.toggle('urgent', left < 15000);
+      if (el.classList.contains('clock') || el.classList.contains('hud-cd')) el.classList.toggle('urgent', left < 15000);
     });
   }, 1000);
 

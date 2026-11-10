@@ -12,7 +12,7 @@ const { decide } = require('./bots');
 const { buildDecks } = require('./cards');
 
 const PORT = +process.env.PORT || 3000;
-const BOT_DELAY = process.env.BOT_DELAY !== undefined ? +process.env.BOT_DELAY : 900;
+const BOT_DELAY = process.env.BOT_DELAY !== undefined ? +process.env.BOT_DELAY : 1600;
 const GRACE = process.env.DISCONNECT_GRACE_MS !== undefined ? +process.env.DISCONNECT_GRACE_MS : 15000;
 const TIMEOUT_SCALE = +process.env.TIMEOUT_SCALE || 1;
 const TUT_HOLD_MS = 3 * 60 * 1000;
@@ -130,7 +130,7 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  const board = url.match(/^\/board\/(felt|back-ticket|back-asset|logo|tut-1|tut-2|tut-3)\.jpg$/);
+  const board = url.match(/^\/board\/(felt|back-ticket|back-asset|logo|tut-1|tut-2|tut-3|desk|room)\.jpg$/);
   if (board) {
     const fp = path.join(BOARD, board[1] + '.jpg');
     if (!fp.startsWith(BOARD)) { res.writeHead(404); return res.end(); }

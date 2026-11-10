@@ -54,6 +54,9 @@ async function until(fn, ms = 5000, what = 'condizione') {
     g.send({ t: 'addBot' });
     await until(() => g.last && g.last.room.members.some(m => m.isBot), 3000, 'guest addBot as host');
     assert(!g.errors.some(e => e.includes('host')), 'addBot rifiutato dopo failover: ' + g.errors.join('; '));
+    const bot = g.last.room.members.find(m => m.isBot);
+    g.send({ t: 'renameBot', id: bot.id, name: 'Rex' });
+    await until(() => g.last.room.members.some(m => m.id === bot.id && m.name === 'Rex'), 3000, 'rename bot');
 
     // --- create switch: no ghost in old lobby ---
     const a = client(), b = client();
