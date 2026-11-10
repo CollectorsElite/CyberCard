@@ -32,4 +32,12 @@ for (const f of ['index.html', 'client.js', 'admin.html', 'admin.js']) {
   assert(!/style=/.test(fs.readFileSync(path.join(root, 'public', f), 'utf8')), `style inline in public/${f}`);
 }
 
+// Tutorial pre-partita: esattamente 3 schede, opt-out salvato, miniature che esistono davvero.
+const tm = src.match(/const TUT = \[[\s\S]*?\n  \];/);
+assert(tm, 'TUT non trovato in client.js');
+const TUT = new Function(tm[0] + '; return TUT;')();
+assert.strictEqual(TUT.length, 3, 'il tutorial deve avere esattamente 3 schede');
+assert(src.includes("store.get('esc-tut-off')") && src.includes("store.set('esc-tut-off'"), 'opt-out del tutorial non salvato');
+for (const [, s] of TUT.join('').matchAll(/\/cards\/([a-z0-9-]+)\.jpg/g)) assert(fs.existsSync(path.join(root, 'art', 'cards', s + '.jpg')), 'tutorial: manca art/cards/' + s + '.jpg');
+
 console.log(`OK art (${T.length + A.length} carte)`);

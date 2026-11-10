@@ -79,6 +79,7 @@
           S.deadlineAt = m.view.deadlineIn != null ? Date.now() + m.view.deadlineIn : 0;
           S.offerAt = m.view.offerIn != null ? Date.now() + m.view.offerIn : 0;
           handleFx(m.view.fx, fresh);
+          if (fresh && m.view.turn === 1 && !m.view.over && !store.get('esc-tut-off')) openTut();
         }
         render();
         afterSync();
@@ -189,7 +190,7 @@
       case 'lateral': R.push('Durante un combattimento aggiunge una Minaccia dalla tua mano.', 'Sul combattimento di un altro è un sabotaggio: +1 Esposizione.'); break;
       case 'gear': R.push(`Slot ${SLOTS[c.slot]} · +${c.bonus} · valore ${c.value}`); if (c.roleBonus) R.push(`+${c.roleBonus.n} extra per ${(ROLES[c.roleBonus.role] || { name: c.roleBonus.role }).name}`); break;
       case 'oneshot': R.push(c.escape ? 'Quando devi fuggire: ti sganci senza tirare il dado.' : `+${c.bonus} a una delle due parti di un combattimento qualsiasi.`, `Valore ${c.value}`); break;
-      case 'levelup': R.push('+1 livello nel tuo turno, fuori dal combattimento. Non porta a 10.'); break;
+      case 'levelup': R.push('+1 livello in qualsiasi momento, fuori dal combattimento. Non porta a 10.'); break;
     }
     return `<p class="kind">${KIND[c.type] || ''}</p><ul class="fx">${R.map(r => `<li>${esc(r)}</li>`).join('')}</ul>${bad ? `<p class="pen">${esc(bad)}</p>` : ''}${c.d && c.type !== 'role' ? `<p class="flav">«${esc(c.d)}»</p>` : ''}`;
   }
@@ -634,6 +635,7 @@
       buttons: () => {
         const layout = store.get('esc-hand-layout') || 'row';
         return [
+          { label: 'Come si gioca in 3 schede', on: openTut },
           { label: `Passo automatico senza carte da combattimento: ${S.autopass ? 'attivo' : 'disattivo'}`, on: () => { S.autopass = !S.autopass; store.set('esc-autopass', S.autopass); scheduleAutopass(); toast(`Passo automatico ${S.autopass ? 'attivato' : 'disattivato'}.`); openRules(); } },
           { label: `Layout mano: ${layout === 'fan' ? 'ventaglio (hook)' : 'fila'} — tocca per cambiare`, on: () => { const next = layout === 'fan' ? 'row' : 'fan'; store.set('esc-hand-layout', next); toast(`Mano: ${next === 'fan' ? 'ventaglio (struttura pronta, tema dopo)' : 'fila'}.`); render(); openRules(); } },
           { label: 'Chiudi', cls: 'primary' }
@@ -658,6 +660,85 @@
         <h4>Tempi e disconnessioni</h4><p>Ogni decisione ha un tempo massimo: allo scadere il server passa, chiude il turno o tira la fuga al posto tuo. Se perdi la connessione hai 15 secondi per rientrare, poi le tue mosse diventano automatiche finché non torni.</p>`}</div>`
     });
   }
+
+  /* ================= come si gioca: 3 schede scorrevoli ================= */
+  // Solo testo statico: test/art.js le valuta e verifica che le miniature esistano.
+  const TUT = [
+    ['Obiettivo e turno', `<div class="tgoal"><b class="tbig">1</b><span class="tarr" aria-hidden="true">→</span><b class="tbig g">10</b>
+      <p>Da <i>guest</i> a <b>root</b>: vince chi arriva per primo a livello 10. L'ultimo livello si prende solo battendo una Minaccia.</p></div>
+      <ol class="tflow">
+        <li><b>Preparati</b><span>Equipaggia asset, assumi un ruolo, usa carte livello. Quando vuoi, mai durante un combattimento.</span></li>
+        <li class="hot"><b>Apri un ticket</b><span>Minaccia: combatti. Sfiga: la subisci. Altro: va in mano.</span></li>
+        <li><b>Non hai combattuto?</b><span><i>Cerca guai</i> con una Minaccia dalla mano, oppure <i>analizza i log</i> e peschi una carta coperta.</span></li>
+        <li><b>Fine turno</b><span>Massimo 5 carte in mano: il resto si scarta.</span></li>
+      </ol>
+      <p class="tnote">Ogni decisione ha un timer: allo scadere il server sceglie per te. Sì, il turno corre anche mentre leggi.</p>`],
+    ['Combattimento', `<div class="tvs">
+        <div class="tside f"><small>Tu</small><b>Livello + Asset</b><span>+ carte a uso singolo<br>+ chi ti aiuta</span></div>
+        <span class="tvsx">VS</span>
+        <div class="tside m"><small>Minaccia</small><b>Forza</b><span>+ Interferenze<br>degli altri</span></div></div>
+      <p class="tcenter">Serve forza <b>più alta</b>: il pareggio lo vince solo il Red Teamer.</p>
+      <p class="tnote">Poi si apre la finestra: tutti dichiarano «passo», e ogni carta giocata riapre il giro.</p>
+      <div class="tout">
+        <div class="win"><b>Vinci</b><span>+1 o +2 livelli per Minaccia e tesori: carte dal mazzo Asset.</span></div>
+        <div class="lose"><b>Perdi</b><span>Dado per fuggire: 5+ (Sysadmin 4+). Se ti prende, subisci «Se non scappi». Un Rollback ti sgancia senza dado.</span></div></div>
+      <div class="tout duo">
+        <div><b>Aiuto</b><span>Offri una parte dei tesori: l'aiutante somma la sua forza, ma non sale di livello.</span></div>
+        <div><b>Sabotaggio</b><span>Potenziare la Minaccia di un altro o giocargli una Sfiga: +1 Esposizione. A 4, audit del SOC: −1 livello.</span></div></div>`],
+    ['Le carte', `<div class="tdecks">
+        <div class="tdeck"><img class="tback" src="/board/back-ticket.jpg" alt=""><div><h5>Mazzo Ticket</h5><ul>
+          <li><b>Minacce</b> da combattere</li><li><b>Sfighe</b> da giocare sugli altri, quando vuoi</li>
+          <li><b>Ruoli</b>: uno alla volta, ognuno con un potere</li><li><b>Interferenze</b>: forza in più o in meno alla Minaccia</li></ul>
+          <div class="tthumbs"><img src="/cards/threat-certificato-ssl-scaduto.jpg" alt="Minaccia" loading="lazy"><img src="/cards/curse-licenza-scaduta.jpg" alt="Sfiga" loading="lazy"><img src="/cards/role-red.jpg" alt="Ruolo" loading="lazy"><img src="/cards/boost-zero-day-fresco.jpg" alt="Interferenza" loading="lazy"></div></div></div>
+        <div class="tdeck"><img class="tback" src="/board/back-asset.jpg" alt=""><div><h5>Mazzo Asset</h5><ul>
+          <li><b>Equipaggiamento</b>: un asset per slot</li><li><b>Uso singolo</b>: bonus a un combattimento, o Rollback per fuggire</li>
+          <li><b>Carte livello</b>: +1 livello, ma non portano a 10</li></ul>
+          <div class="tslots"><span>Hardware</span><span>Software</span><span>Credenziali</span><span>Gadget</span></div>
+          <div class="tthumbs"><img src="/cards/gear-hw-raspberry-pi-nel-controsoffitto.jpg" alt="Asset" loading="lazy"><img src="/cards/oneshot-caffe-della-macchinetta.jpg" alt="Uso singolo" loading="lazy"><img src="/cards/oneshot-rollback.jpg" alt="Rollback" loading="lazy"><img src="/cards/level-certificazione-appena-presa.jpg" alt="Carta livello" loading="lazy"></div></div></div></div>
+      <div class="tsell"><span>Vendi asset e carte a uso singolo: credito</span><b class="tbig">1000</b><span>= +1 livello (fino al 9)</span></div>
+      <p class="tnote">Si parte con 3 carte Ticket e 2 Asset. Tocca una carta per leggerne l'effetto: la Wiki nelle Regole le ha tutte.</p>`]
+  ];
+  const tut = document.createElement('div');
+  tut.id = 'tut'; tut.className = 'hidden';
+  tut.innerHTML = `<div class="tbox" role="dialog" aria-modal="true" aria-labelledby="tutT" tabindex="-1">
+    <div class="thead"><h3 id="tutT">Come si gioca</h3><button type="button" class="btn ghost" data-t="skip">Salta</button></div>
+    <div class="ttrack">${TUT.map(([t, h], i) => `<section class="tslide" aria-label="Scheda ${i + 1} di ${TUT.length}: ${t}"><h4><span>${i + 1}/${TUT.length}</span> ${t}</h4>${h}</section>`).join('')}</div>
+    <div class="tfoot"><button type="button" class="btn" data-t="prev">← Indietro</button>
+      <span class="tdots">${TUT.map((t, i) => `<button type="button" data-t="${i}" aria-label="Scheda ${i + 1}: ${t[0]}"></button>`).join('')}</span>
+      <button type="button" class="btn primary" data-t="next">Avanti →</button>
+      <label class="toff"><input type="checkbox"> Non mostrare più all'inizio della partita</label></div></div>`;
+  document.body.appendChild(tut);
+  const track = tut.querySelector('.ttrack');
+  const tutAt = () => Math.round(track.scrollLeft / (track.clientWidth || 1));
+  const tutGo = i => track.scrollTo({ left: Math.max(0, Math.min(TUT.length - 1, i)) * track.clientWidth });
+  function tutSync() {
+    const i = tutAt();
+    tut.querySelectorAll('.tdots button').forEach((d, k) => k === i ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current'));
+    tut.querySelector('[data-t="prev"]').disabled = i === 0;
+    tut.querySelector('[data-t="next"]').textContent = i === TUT.length - 1 ? 'Gioca' : 'Avanti →';
+  }
+  function openTut() {
+    if (tut.classList.contains('hidden')) S.tutBack = document.activeElement;
+    hidePeek();
+    tut.querySelector('.toff input').checked = !!store.get('esc-tut-off');
+    tut.classList.remove('hidden'); $('#app').inert = true;
+    track.scrollTo({ left: 0, behavior: 'instant' }); tutSync(); tut.querySelector('.tbox').focus();
+  }
+  function closeTut() {
+    tut.classList.add('hidden'); $('#app').inert = false;
+    const back = S.tutBack; S.tutBack = null;
+    if (back && typeof back.focus === 'function') try { back.focus(); } catch (e) { /* ignore */ }
+  }
+  track.addEventListener('scroll', tutSync, { passive: true });
+  tut.addEventListener('change', e => store.set('esc-tut-off', e.target.checked));
+  tut.addEventListener('click', e => {
+    e.stopPropagation();
+    const b = e.target.closest('[data-t]');
+    if (!b) { if (e.target === tut) closeTut(); return; }
+    const t = b.dataset.t, i = tutAt();
+    if (t === 'skip' || (t === 'next' && i === TUT.length - 1)) closeTut();
+    else tutGo(t === 'prev' ? i - 1 : t === 'next' ? i + 1 : +t);
+  });
 
   /* ================= anteprima al passaggio del mouse ================= */
   const peek = document.createElement('div');
@@ -689,6 +770,11 @@
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && S.modal && S.modal.dismiss) { closeModal(); return; }
+    if (!S.modal && !tut.classList.contains('hidden')) {
+      if (e.key === 'Escape') closeTut();
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); tutGo(tutAt() + (e.key === 'ArrowRight' ? 1 : -1)); }
+      return;
+    }
     if (e.key === 'Enter' || e.key === ' ') {
       if (e.target && e.target.id === 'log') { e.preventDefault(); S.logOpen = !S.logOpen; render(); return; }
     }
