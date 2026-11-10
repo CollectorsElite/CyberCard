@@ -759,17 +759,62 @@
   }
 
   /* ================= come si gioca: 3 schede scorrevoli ================= */
-  // Array statico: test/art.js lo valuta. L'alt riassume la scheda per chi non vede l'immagine.
+  // Array statico: test/art.js lo valuta. Titolo e frase d'apertura di ogni scheda; il corpo è in tutBody.
   const TUT = [
-    ["Obiettivo e turno", "/board/tut-1.jpg", "Da livello 1 a 10 (root): vince chi arriva primo. L'ultimo livello solo battendo una Minaccia. Preparati, apri un ticket, se non combatti cerca guai o analizza i log, fine turno massimo 5 carte."],
-    ["Combattimento", "/board/tut-2.jpg", "Tu (livello, asset, uso singolo, chi aiuta) contro la Minaccia (forza e interferenze). Serve più forza; il pareggio lo vince solo il Red Teamer. Vinci livelli e tesori, altrimenti dado per fuggire. Aiuto e sabotaggio."],
-    ["Le carte", "/board/tut-3.jpg", "Mazzo Ticket (Minacce, Sfighe, Ruoli, Interferenze) e mazzo Asset (equipaggiamento per slot, uso singolo, carte livello che non portano a 10). 1000 di credito vale un livello fino al 9. Si parte con 3 Ticket e 2 Asset."]
+    ["Obiettivo e turno", "Da livello 1 a livello 10, root: vince chi ci arriva per primo. L'ultimo livello si prende solo battendo una Minaccia."],
+    ["Combattimento", "Serve più forza della Minaccia. Il pareggio lo vince solo il Red Teamer."],
+    ["Le carte", "Due mazzi. Si parte con 3 Ticket e 2 Asset in mano."]
   ];
+  // Le qualifiche dei dieci livelli, come in server/cards.js (test/art.js controlla che coincidano).
+  const LADDER = ['guest', 'stagista', 'utente', 'power user', 'helpdesk', 'tecnico', 'senior', 'domain admin', 'enterprise admin', 'root'];
+  // Carta d'esempio, non cliccabile: le schede mostrano le stesse carte e gli stessi elementi del tavolo.
+  const tcard = (art, type, tag) => `<span class="card k-${type}"><span class="face" data-art="${art}"><img src="/${art.startsWith('back-') ? 'board' : 'cards'}/${art}.jpg" alt=""></span>${tag ? `<span class="tag">${tag}</span>` : ''}</span>`;
+  function tutBody(i) {
+    if (i === 0) return `<ol class="ladder" aria-label="I dieci livelli">${LADDER.map((t, k) => `<li${k === 9 ? ' class="top"' : ''}><b>${k + 1}</b><small>${t}</small></li>`).join('')}</ol>
+      <h5>Il tuo turno</h5>
+      <ol class="tsteps">
+        <li><span class="tvis">${tcard('gear-hw-laptop-pieno-di-adesivi', 'gear', '+1')}</span><div><b>Preparati</b><p>Equipaggia gli asset, assumi un ruolo, usa le carte livello.</p></div></li>
+        <li><span class="tvis">${tcard('back-ticket', 'back')}</span><div><b>Apri un ticket</b><p>Minaccia: combatti. Sfiga: la subisci. Altro: va in mano.</p></div></li>
+        <li><span class="tvis">${tcard('threat-password-su-un-post-it', 'threat', '1')}</span><div><b>Se non combatti</b><p>Cerca guai con una Minaccia dalla tua mano, oppure analizza i log e pesca una carta coperta.</p></div></li>
+        <li><span class="tvis tfan">${tcard('curse-reset-password-obbligatorio', 'curse')}${tcard('oneshot-caffe-della-macchinetta', 'oneshot')}${tcard('role-red', 'role')}</span><div><b>Chiudi il turno</b><p>Massimo 5 carte in mano: scegli tu cosa scartare.</p></div></li>
+      </ol>`;
+    if (i === 1) return `<div class="tmat">
+        <div class="tduel">
+          <div class="tside f"><span class="tlab">Tu</span><b class="tpow">7</b><small>livello 4, asset +3</small></div>
+          <div class="vs w"><span class="burst" aria-hidden="true">VS</span><b>vince</b></div>
+          <div class="tside m"><span class="tlab">Minaccia</span><b class="tpow">6</b><small>forza 6</small></div>
+          ${tcard('threat-shadow-it-del-marketing', 'threat', '6')}
+        </div>
+        <p class="tsum"><b>Tu:</b> livello, asset, carte a uso singolo e chi ti aiuta. <b>Minaccia:</b> forza e interferenze.</p>
+      </div>
+      <p class="tnote">Prima dell'esito si apre la finestra di interferenza: ognuno gioca una carta o passa.</p>
+      <ul class="touts">
+        <li><span class="tv">${tcard('back-asset', 'back')}</span><div><span class="tchip win">Vinci</span><p>+1 o +2 livelli e tesori dal mazzo Asset.</p></div></li>
+        <li><span class="tv"><span class="die" data-v="5" aria-hidden="true">${'<i></i>'.repeat(9)}</span></span><div><span class="tchip lose">Perdi</span><p>Tiri il dado per fuggire: serve 5 o più, al Sysadmin basta 4. Se fallisci subisci la penalità della Minaccia. Con un Rollback scappi senza tirare.</p></div></li>
+        <li><span class="tv"><span class="ava" data-seat="0" aria-hidden="true">TU</span><span class="ava" data-seat="1" aria-hidden="true">+</span></span><div><span class="tchip help">Aiuto</span><p>Offri una parte dei tesori. Chi ti aiuta somma la sua forza, ma non sale di livello.</p></div></li>
+        <li><span class="tv"><span class="esp" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></span><div><span class="tchip sab">Sabotaggio</span><p>Potenziare la Minaccia di un altro o giocargli una Sfiga costa 1 punto di Esposizione. A 4 scatta l'audit del SOC: perdi 1 livello.</p></div></li>
+      </ul>`;
+    const kind = (card, name, text) => `<li>${card}<div><b>${name}</b><p>${text}</p></div></li>`;
+    return `<div class="tdecks">
+        <section><div class="tdeck">${tcard('back-ticket', 'back')}<h5>Mazzo Ticket</h5></div><ul class="tkinds">
+          ${kind(tcard('threat-ransomware-con-assistenza-clienti', 'threat', '11'), 'Minacce', 'Da combattere. Il numero è la loro forza.')}
+          ${kind(tcard('curse-reset-password-obbligatorio', 'curse'), 'Sfighe', 'Le giochi sugli altri, quando vuoi.')}
+          ${kind(tcard('role-red', 'role'), 'Ruoli', 'Un potere speciale. Uno alla volta.')}
+          ${kind(tcard('boost-zero-day-fresco', 'boost', '+10'), 'Interferenze', 'Forza in più o in meno alla Minaccia.')}
+        </ul></section>
+        <section><div class="tdeck">${tcard('back-asset', 'back')}<h5>Mazzo Asset</h5></div><ul class="tkinds">
+          ${kind(tcard('gear-hw-laptop-pieno-di-adesivi', 'gear', '+1'), 'Equipaggiamento', 'Un asset per slot: Hardware, Software, Credenziali, Gadget.')}
+          ${kind(tcard('oneshot-caffe-della-macchinetta', 'oneshot', '+2'), 'Uso singolo', 'Un bonus in combattimento. Il Rollback fa fuggire senza dado.')}
+          ${kind(tcard('level-certificazione-appena-presa', 'levelup'), 'Carte livello', '+1 livello, ma non portano a 10.')}
+        </ul></section>
+      </div>
+      <p class="tnote">Vendi gli asset per ottenere credito: ogni 1000 vale +1 livello, fino al 9.</p>`;
+  }
   const tut = document.createElement('div');
   tut.id = 'tut'; tut.className = 'hidden';
   tut.innerHTML = `<div class="tbox" role="dialog" aria-modal="true" aria-labelledby="tutT" tabindex="-1">
     <div class="thead"><h3 id="tutT">Come si gioca</h3><button type="button" class="btn ghost" data-t="skip">Salta</button></div>
-    <div class="ttrack">${TUT.map(([t, src, alt], i) => `<section class="tslide" aria-label="Scheda ${i + 1} di ${TUT.length}: ${esc(t)}"><img src="${src}" alt="${esc(alt)}"></section>`).join('')}</div>
+    <div class="ttrack">${TUT.map(([t, lead], i) => `<section class="tslide" aria-label="Scheda ${i + 1} di ${TUT.length}: ${esc(t)}"><div class="tslide-in"><h4>${esc(t)}</h4><p class="tlead">${esc(lead)}</p>${tutBody(i)}</div></section>`).join('')}</div>
     <div class="tfoot"><button type="button" class="btn" data-t="prev">← Indietro</button>
       <span class="tdots">${TUT.map((t, i) => `<button type="button" data-t="${i}" aria-label="Scheda ${i + 1}: ${t[0]}"></button>`).join('')}</span>
       <button type="button" class="btn primary" data-t="next">Avanti →</button>

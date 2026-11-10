@@ -53,6 +53,17 @@ assert(html.includes('href="/cards.css"'), 'index.html non carica /cards.css');
 assert(css.includes("url('/fonts/archivo.woff2')") && fs.existsSync(path.join(root, 'public', 'fonts', 'archivo.woff2')), 'font Archivo mancante');
 const srv = fs.readFileSync(path.join(root, 'server', 'index.js'), 'utf8');
 for (const u of ["'/cards.css'", "'/fonts/archivo.woff2'"]) assert(srv.includes(u), `il server non serve ${u}`);
-for (const n of [1, 2, 3]) assert(TUT.some(row => String(row[1]) === '/board/tut-' + n + '.jpg'), 'tutorial senza /board/tut-' + n + '.jpg');
+
+// Le schede sono HTML: titolo e frase d'apertura in TUT, il corpo in tutBody con carte vere d'esempio.
+for (const row of TUT) assert(row.length === 2 && row.every(x => typeof x === 'string' && x.trim()), 'scheda del tutorial senza titolo o testo');
+const tb = src.match(/function tutBody\(i\) \{[\s\S]*?\n  \}/);
+assert(tb, 'tutBody non trovato in client.js');
+const tutArt = [...tb[0].matchAll(/tcard\('([a-z0-9-]+)'/g)].map(m => m[1]);
+assert(tutArt.length >= 10, 'il tutorial non mostra carte');
+const tutMissing = [...new Set(tutArt)].filter(a => !fs.existsSync(path.join(root, 'art', a.startsWith('back-') ? 'board' : 'cards', a + '.jpg')) || !frames.includes(`[data-art="${a}"]{`));
+assert.deepStrictEqual(tutMissing, [], 'carte del tutorial senza illustrazione o ritaglio: ' + tutMissing.join(', '));
+const lm = src.match(/const LADDER = (\[[^\]]*\]);/);
+assert(lm, 'LADDER non trovato in client.js');
+assert.deepStrictEqual(new Function('return ' + lm[1])(), require('../server/cards').TITLES.slice(1), 'le qualifiche del tutorial non coincidono con server/cards.js');
 
 console.log(`OK art (${T.length + A.length} carte)`);
