@@ -131,6 +131,7 @@
         break;
       case 'audit': toast(e.pid === me ? `Audit del SOC: troppe tracce, perdi 1 livello.${q}` : `Audit del SOC su ${name(e.pid)}.${q}`, e.pid === me ? 'bad' : 'warn', 7000); break;
       case 'win': if (e.pid === me) toast(`Minaccia neutralizzata: sei a livello ${e.level}.${q}`, 'good', 7000); break;
+      case 'kept': toast(`Va in mano: ${e.card}.`, 'good', 5000); break;
       case 'drawn': toast(`Peschi: ${e.cards.join(', ')}.`, 'good', 6000); break;
       case 'gameover': toast(`${e.winner === me ? 'Hai ottenuto root. Hai vinto.' : name(e.winner) + ' ha ottenuto root.'}${q}`, e.winner === me ? 'good' : 'warn', 10000); break;
     }

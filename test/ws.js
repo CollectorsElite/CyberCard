@@ -62,7 +62,8 @@ async function until(fn, ms = 8000, what = 'condizione') {
     // isolamento: ognuno vede solo la propria mano, mai quella degli altri
     for (const x of [a, b, c]) {
       const v = x.last.view;
-      assert.strictEqual(v.hand.length, 8);
+      assert.strictEqual(v.hand.length, 5);
+      assert.strictEqual(v.hand.filter(c => c.deck === 'A').length, 2);
       for (const p of v.players) assert(!('hand' in p), 'mano altrui nella vista');
     }
     const uidsA = new Set(a.last.view.hand.map(x => x.uid));

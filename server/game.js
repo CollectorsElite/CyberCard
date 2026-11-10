@@ -30,7 +30,7 @@ class Game {
     this.id = crypto.randomBytes(4).toString('hex');
     this.logs = []; this.fxs = []; this.seq = 0; this.version = 0;
     this.turn = 1; this.combat = null; this.revealed = null; this.over = false; this.winner = null;
-    for (const p of this.players) for (let i = 0; i < 4; i++) { p.hand.push(this.draw('T')); p.hand.push(this.draw('A')); }
+    for (const p of this.players) p.hand.push(this.draw('T'), this.draw('T'), this.draw('T'), this.draw('A'), this.draw('A'));
     this.cur = this.rng(this.players.length);
     this.startSeat = this.cur;
     this.log('Nuova partita. Il primo che arriva a livello 10 (root) vince.', 'sys');
@@ -128,7 +128,7 @@ class Game {
     this.revealed = { card, by: p.id };
     if (card.type === 'threat') return this.startCombat(p, [card]);
     if (card.type === 'curse') this.applyCurse(p, card, null);
-    else p.hand.push(card);
+    else { p.hand.push(card); this.fx({ kind: 'kept', to: p.id, card: card.name }); }
     this.phase = 'after'; this.setDeadline(this.to.turn);
   }
   a_trouble(p, a) {
