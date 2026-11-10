@@ -54,10 +54,32 @@ async function until(fn, ms = 8000, what = 'condizione') {
 
     b.send({ t: 'start' });
     await until(() => b.errors.some(e => e.includes('host')), 3000, 'start rifiutato a non host');
-    a.send({ t: 'addBot' }); a.send({ t: 'addBot' });
-    await until(() => a.last.room.members.length === 5, 3000, '5 membri');
+    a.send({ t: 'addBot', name: 'Nino' }); a.send({ t: 'addBot' });
+    await until(() => a.last.room.members.length === 5 && a.last.room.members.some(m => m.name === 'Nino' && m.isBot), 3000, '5 membri');
+    const nino = a.last.room.members.find(m => m.name === 'Nino');
+    const errN = a.errors.length;
+    a.send({ t: 'addBot', name: 'Nino' });
+    a.send({ t: 'renameBot', id: nino.id, name: '   ' });
+    a.send({ t: 'renameBot', id: nino.id, name: 'Bob' });
+    await until(() => a.errors.length >= errN + 3, 3000, 'nomi bot rifiutati');
+    assert(a.errors.slice(errN).some(e => e.includes('già')), 'duplicato bot accettato');
+    assert(a.errors.slice(errN).some(e => e.includes('Scrivi')), 'nome bot vuoto accettato');
+    assert.strictEqual(a.last.room.members.length, 5, 'bot duplicato aggiunto');
+    a.send({ t: 'renameBot', id: nino.id, name: 'Nino2' });
+    await until(() => a.last.room.members.some(m => m.id === nino.id && m.name === 'Nino2'), 3000, 'bot rinominato');
+    const errB = b.errors.length;
+    b.send({ t: 'renameBot', id: nino.id, name: 'Nope' });
+    await until(() => b.errors.length > errB, 3000, 'rename non host');
+    assert(b.errors.at(-1).includes('host'), 'rename bot consentito a non host');
     a.send({ t: 'start' });
     await until(() => a.last && a.last.view && b.last.view && c.last.view, 3000, 'partita avviata');
+    assert.strictEqual(a.last.view.phase, 'open');
+    assert.strictEqual(a.last.view.version, 0);
+    assert(a.last.tut && a.last.tut.total === 3 && a.last.tut.ready === 0, 'gate tutorial assente');
+    assert(a.last.view.deadlineIn > Math.round(90000 * 0.02), 'deadline del primo turno non è il gate: ' + a.last.view.deadlineIn);
+    await wait(400);
+    assert.strictEqual(a.last.view.version, 0, 'la partita avanza prima di tutDone');
+    assert.strictEqual(a.last.view.phase, 'open');
 
     // isolamento: ognuno vede solo la propria mano, mai quella degli altri
     for (const x of [a, b, c]) {
@@ -80,6 +102,10 @@ async function until(fn, ms = 8000, what = 'condizione') {
     notCur.send({ t: 'act', a: null });
     notCur.ws.send('{non json');
     await until(() => notCur.errors.length >= errBefore + 5, 3000, 'rifiuto input ostili');
+    a.send({ t: 'tutDone' });
+    await until(() => a.last.tut && a.last.tut.ready === 1, 3000, 'un tutDone');
+    for (const x of [b, c]) x.send({ t: 'tutDone' });
+    await until(() => !a.last.tut && a.last.view.deadlineIn <= Math.round(90000 * 0.02) + 50, 3000, 'gate tutorial chiuso');
 
     // gli umani giocano in modo semplice: passano, aprono, chiudono turno
     const humans = [a, b, c];

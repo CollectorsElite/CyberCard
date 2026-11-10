@@ -25,7 +25,7 @@ for (const q of Object.values(QUIPS).flat()) assert(!/^«|»$/.test(q), 'il fume
 
 const docker = fs.readFileSync(path.join(root, 'Dockerfile'), 'utf8');
 for (const d of ['art/cards', 'art/board']) assert(docker.includes(`COPY ${d} `), `il Dockerfile non copia ${d}: in produzione le immagini sarebbero 404`);
-for (const f of ['felt', 'back-ticket', 'back-asset', 'logo']) assert(fs.existsSync(path.join(root, 'art', 'board', f + '.jpg')), 'manca art/board/' + f + '.jpg');
+for (const f of ['felt', 'back-ticket', 'back-asset', 'logo', 'tut-1', 'tut-2', 'tut-3']) assert(fs.existsSync(path.join(root, 'art', 'board', f + '.jpg')), 'manca art/board/' + f + '.jpg');
 
 // La CSP (style-src 'self') blocca gli attributi style inline: il browser li ignora in silenzio.
 for (const f of ['index.html', 'client.js', 'admin.html', 'admin.js']) {
@@ -38,6 +38,6 @@ assert(tm, 'TUT non trovato in client.js');
 const TUT = new Function(tm[0] + '; return TUT;')();
 assert.strictEqual(TUT.length, 3, 'il tutorial deve avere esattamente 3 schede');
 assert(src.includes("store.get('esc-tut-off')") && src.includes("store.set('esc-tut-off'"), 'opt-out del tutorial non salvato');
-for (const [, s] of TUT.join('').matchAll(/\/cards\/([a-z0-9-]+)\.jpg/g)) assert(fs.existsSync(path.join(root, 'art', 'cards', s + '.jpg')), 'tutorial: manca art/cards/' + s + '.jpg');
+for (const n of [1, 2, 3]) assert(TUT.some(row => String(row[1]) === '/board/tut-' + n + '.jpg'), 'tutorial senza /board/tut-' + n + '.jpg');
 
 console.log(`OK art (${T.length + A.length} carte)`);

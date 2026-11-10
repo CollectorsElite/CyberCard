@@ -15,6 +15,7 @@ const PORT = +process.env.PORT || 3000;
 const BOT_DELAY = process.env.BOT_DELAY !== undefined ? +process.env.BOT_DELAY : 900;
 const GRACE = process.env.DISCONNECT_GRACE_MS !== undefined ? +process.env.DISCONNECT_GRACE_MS : 15000;
 const TIMEOUT_SCALE = +process.env.TIMEOUT_SCALE || 1;
+const TUT_HOLD_MS = 3 * 60 * 1000;
 const MAX_ROOMS = +process.env.MAX_ROOMS || 200;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
 const ROOM_MAX_MS = +process.env.ROOM_MAX_MS || 4 * 60 * 60 * 1000;
@@ -129,7 +130,7 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  const board = url.match(/^\/board\/(felt|back-ticket|back-asset|logo)\.jpg$/);
+  const board = url.match(/^\/board\/(felt|back-ticket|back-asset|logo|tut-1|tut-2|tut-3)\.jpg$/);
   if (board) {
     const fp = path.join(BOARD, board[1] + '.jpg');
     if (!fp.startsWith(BOARD)) { res.writeHead(404); return res.end(); }
@@ -160,21 +161,46 @@ function uniqueName(room, name) {
   while (room.members.some(m => m.name.toLowerCase() === n.toLowerCase())) n = `${name} ${i++}`;
   return n;
 }
+function suggestBotName(room) {
+  const free = BOT_NAMES.filter(n => !room.members.some(m => m.name === n));
+  return free[0] || uniqueName(room, 'Bot');
+}
+// Nome assente: suggerimento intero. Altrimenti la stessa cleanName dei giocatori (max 20).
+function botName(room, raw) {
+  const suggestion = suggestBotName(room);
+  if (raw == null) return suggestion;
+  if (String(raw).replace(/\s+/g, ' ').trim() === suggestion) return suggestion;
+  return cleanName(raw);
+}
 function roomView(room, me) {
   return {
     code: room.code, host: room.host, you: me ? me.id : null, started: !!room.game, over: !!(room.game && room.game.over),
-    min: MIN_PLAYERS, max: MAX_PLAYERS,
+    min: MIN_PLAYERS, max: MAX_PLAYERS, nextBot: room.game ? null : suggestBotName(room),
     members: room.members.map(m => ({ id: m.id, name: m.name, isBot: m.isBot, connected: m.isBot || m.connected, left: !!m.left }))
   };
 }
+function tutInfo(room) {
+  if (!room.tutHeld) return null;
+  const humans = room.members.filter(m => !m.isBot && !m.left);
+  return { ready: humans.filter(m => room.tutReady.has(m.id)).length, total: humans.length };
+}
 function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 function broadcast(room) {
+  const tut = tutInfo(room);
   for (const m of room.members) {
     if (m.isBot || !m.ws) continue;
-    send(m.ws, { t: 'sync', room: roomView(room, m), view: room.game ? room.game.view(m.id) : null });
+    send(m.ws, { t: 'sync', room: roomView(room, m), view: room.game ? room.game.view(m.id) : null, tut });
   }
 }
-function afterChange(room) { room.lastActive = Date.now(); broadcast(room); pump(room); }
+function liftTutIfReady(room) {
+  if (!room.tutHeld || !room.game) return;
+  const humans = room.members.filter(m => !m.isBot && !m.left);
+  if (humans.length && !humans.every(m => room.tutReady.has(m.id))) return;
+  room.tutHeld = false;
+  const g = room.game;
+  if (!g.over && g.turn === 1 && g.phase === 'open' && !g.combat) g.setDeadline(g.to.turn);
+}
+function afterChange(room) { liftTutIfReady(room); room.lastActive = Date.now(); broadcast(room); pump(room); }
 
 function allowCreate(ws) {
   if (++ws.ctx.createTries > MAX_CREATES_PER_SOCKET) return false;
@@ -201,6 +227,15 @@ function transferHost(room, exceptId) {
 function pump(room) {
   clearTimeout(room.timer); room.timer = null;
   const g = room.game; if (!g || g.over) return;
+  if (room.tutHeld) {
+    room.timer = setTimeout(() => {
+      room.timer = null;
+      if (room.game !== g || g.over || !room.tutHeld) return;
+      for (const m of room.members) if (!m.isBot && !m.left) room.tutReady.add(m.id);
+      afterChange(room);
+    }, Math.max(50, g.deadline - Date.now()));
+    return;
+  }
   const now = Date.now();
   const actorFor = id => {
     const m = room.members.find(x => x.id === id);
@@ -266,6 +301,9 @@ function startGame(room) {
     timeouts: Object.fromEntries(Object.entries(DEFAULT_TIMEOUTS).map(([k, v]) => [k, Math.round(v * TIMEOUT_SCALE)]))
   });
   room.members = players;
+  room.tutReady = new Set();
+  room.tutHeld = players.some(m => !m.isBot);
+  if (room.tutHeld) room.game.setDeadline(Math.round(TUT_HOLD_MS * TIMEOUT_SCALE));
   afterChange(room);
 }
 
@@ -318,8 +356,27 @@ function handleMessage(ws, msg) {
     case 'addBot': {
       if (!isHost || room.game) return send(ws, { t: 'error', msg: 'Solo l\'host, prima dell\'inizio.' });
       if (room.members.length >= MAX_PLAYERS) return send(ws, { t: 'error', msg: 'Stanza piena.' });
-      const free = BOT_NAMES.filter(n => !room.members.some(m => m.name === n));
-      room.members.push({ id: newId(), token: '', name: free[0] || uniqueName(room, 'Bot'), isBot: true, connected: true });
+      const name = botName(room, 'name' in msg ? msg.name : null);
+      if (!name) return send(ws, { t: 'error', msg: 'Scrivi un nome.' });
+      if (room.members.some(m => m.name.toLowerCase() === name.toLowerCase())) return send(ws, { t: 'error', msg: 'Nome già in uso.' });
+      room.members.push({ id: newId(), token: '', name, isBot: true, connected: true });
+      return afterChange(room);
+    }
+    case 'renameBot': {
+      if (!isHost || room.game) return send(ws, { t: 'error', msg: 'Solo l\'host, prima dell\'inizio.' });
+      const m = room.members.find(x => x.id === msg.id && x.isBot);
+      if (!m) return send(ws, { t: 'error', msg: 'Bot non trovato.' });
+      const trimmed = String(msg.name == null ? '' : msg.name).replace(/\s+/g, ' ').trim();
+      if (trimmed.toLowerCase() === m.name.toLowerCase()) return afterChange(room);
+      const name = cleanName(msg.name);
+      if (!name) return send(ws, { t: 'error', msg: 'Scrivi un nome.' });
+      if (room.members.some(x => x !== m && x.name.toLowerCase() === name.toLowerCase())) return send(ws, { t: 'error', msg: 'Nome già in uso.' });
+      m.name = name;
+      return afterChange(room);
+    }
+    case 'tutDone': {
+      if (!room.game || !room.tutHeld) return;
+      room.tutReady.add(me.id);
       return afterChange(room);
     }
     case 'removeMember': {
@@ -344,6 +401,7 @@ function handleMessage(ws, msg) {
       return startGame(room);
     case 'act': {
       if (!room.game) return send(ws, { t: 'error', msg: 'La partita non è iniziata.' });
+      if (room.tutHeld) return send(ws, { t: 'error', msg: 'In attesa che tutti chiudano le istruzioni.' });
       if (!msg.a || typeof msg.a !== 'object') return send(ws, { t: 'error', msg: 'Azione non valida.' });
       try { room.game.handle(me.id, msg.a); }
       catch (e) {

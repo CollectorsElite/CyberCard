@@ -72,14 +72,17 @@
         break;
       case 'sync': {
         S.actPending = false;
-        S.room = m.room; S.you = m.room.you; S.view = m.view;
+        S.room = m.room; S.you = m.room.you; S.view = m.view; S.tut = m.tut || null;
         if (m.view) {
           const fresh = S.gid !== m.view.gid;
           S.gid = m.view.gid;
           S.deadlineAt = m.view.deadlineIn != null ? Date.now() + m.view.deadlineIn : 0;
           S.offerAt = m.view.offerIn != null ? Date.now() + m.view.offerIn : 0;
           handleFx(m.view.fx, fresh);
-          if (fresh && m.view.turn === 1 && !m.view.over && !store.get('esc-tut-off')) openTut();
+          if (fresh && m.view.turn === 1 && !m.view.over) {
+            if (store.get('esc-tut-off')) send({ t: 'tutDone' });
+            else openTut();
+          }
         }
         render();
         afterSync();
@@ -252,6 +255,7 @@
     const r = S.room, isHost = r.host === S.you, link = location.origin + '/?r=' + r.code;
     const lis = r.members.map(m => `<li><span class="nm">${esc(m.name)}</span>
       ${m.id === r.host ? '<span class="badge host">host</span>' : ''}${m.isBot ? '<span class="badge bot">bot</span>' : ''}${!m.connected ? '<span class="badge off">offline</span>' : ''}${m.id === S.you ? '<span class="badge">tu</span>' : ''}
+      ${isHost && m.isBot ? `<button type="button" class="xbtn" data-do="renameBot" data-id="${esc(m.id)}">Rinomina</button>` : ''}
       ${isHost && m.id !== S.you ? `<button type="button" class="xbtn" data-do="remove" data-id="${esc(m.id)}" aria-label="Rimuovi">✕</button>` : ''}</li>`).join('');
     const n = r.members.length, ready = n >= r.min;
     const need = Math.max(0, r.min - n);
@@ -273,6 +277,7 @@
         <p class="lobby-status${ready ? ' ready' : ''}">${esc(status)}</p>
         <ul class="members">${lis}</ul>
         ${isHost ? `<div class="row lobby-host">
+            <input id="fBot" class="botname" data-f="bot" maxlength="32" aria-label="Nome del bot" value="${esc(S.form.bot != null ? S.form.bot : (r.nextBot || ''))}"${n >= r.max ? ' disabled' : ''}>
             <button class="btn" type="button" data-do="addBot"${n >= r.max ? ' disabled' : ''}>Aggiungi un bot</button>
             <button class="btn primary" type="button" data-do="start"${!ready ? ' disabled' : ''}>Avvia la partita</button>
           </div>
@@ -291,8 +296,9 @@
           <div class="pile t" title="Mazzo Ticket" aria-label="Mazzo Ticket: ${v.deck.T} carte"><b>${v.deck.T}</b></div>
           <div class="pile a" title="Mazzo Asset" aria-label="Mazzo Asset: ${v.deck.A} carte"><b>${v.deck.A}</b></div>
         </div>
-        <span class="clock${(S.deadlineAt - Date.now()) < 15000 ? ' urgent' : ''}" data-cd="main" aria-label="Tempo rimasto">${mmss(S.deadlineAt - Date.now())}</span>
+        <span class="clock${S.tut ? ' hold' : (S.deadlineAt - Date.now()) < 15000 ? ' urgent' : ''}" data-cd="main" aria-label="Tempo rimasto">${S.tut ? 'pausa' : mmss(S.deadlineAt - Date.now())}</span>
       </div>
+      ${S.tut ? `<p class="tutwait">In attesa che tutti chiudano le istruzioni (${S.tut.ready}/${S.tut.total})</p>` : ''}
       <section id="opps" aria-label="Avversari">${others.map(oppHTML).join('')}</section>
       <section id="table">${bubblesHTML()}${tableHTML()}</section>
       <section id="me" class="${v.cur === S.you && !v.over ? ' active' : ''}">${meHTML(me)}</section>
@@ -662,47 +668,17 @@
   }
 
   /* ================= come si gioca: 3 schede scorrevoli ================= */
-  // Solo testo statico: test/art.js le valuta e verifica che le miniature esistano.
+  // Array statico: test/art.js lo valuta. L'alt riassume la scheda per chi non vede l'immagine.
   const TUT = [
-    ['Obiettivo e turno', `<div class="tgoal"><b class="tbig">1</b><span class="tarr" aria-hidden="true">→</span><b class="tbig g">10</b>
-      <p>Da <i>guest</i> a <b>root</b>: vince chi arriva per primo a livello 10. L'ultimo livello si prende solo battendo una Minaccia.</p></div>
-      <ol class="tflow">
-        <li><b>Preparati</b><span>Equipaggia asset, assumi un ruolo, usa carte livello. Quando vuoi, mai durante un combattimento.</span></li>
-        <li class="hot"><b>Apri un ticket</b><span>Minaccia: combatti. Sfiga: la subisci. Altro: va in mano.</span></li>
-        <li><b>Non hai combattuto?</b><span><i>Cerca guai</i> con una Minaccia dalla mano, oppure <i>analizza i log</i> e peschi una carta coperta.</span></li>
-        <li><b>Fine turno</b><span>Massimo 5 carte in mano: il resto si scarta.</span></li>
-      </ol>
-      <p class="tnote">Ogni decisione ha un timer: allo scadere il server sceglie per te. Sì, il turno corre anche mentre leggi.</p>`],
-    ['Combattimento', `<div class="tvs">
-        <div class="tside f"><small>Tu</small><b>Livello + Asset</b><span>+ carte a uso singolo<br>+ chi ti aiuta</span></div>
-        <span class="tvsx">VS</span>
-        <div class="tside m"><small>Minaccia</small><b>Forza</b><span>+ Interferenze<br>degli altri</span></div></div>
-      <p class="tcenter">Serve forza <b>più alta</b>: il pareggio lo vince solo il Red Teamer.</p>
-      <p class="tnote">Poi si apre la finestra: tutti dichiarano «passo», e ogni carta giocata riapre il giro.</p>
-      <div class="tout">
-        <div class="win"><b>Vinci</b><span>+1 o +2 livelli per Minaccia e tesori: carte dal mazzo Asset.</span></div>
-        <div class="lose"><b>Perdi</b><span>Dado per fuggire: 5+ (Sysadmin 4+). Se ti prende, subisci «Se non scappi». Un Rollback ti sgancia senza dado.</span></div></div>
-      <div class="tout duo">
-        <div><b>Aiuto</b><span>Offri una parte dei tesori: l'aiutante somma la sua forza, ma non sale di livello.</span></div>
-        <div><b>Sabotaggio</b><span>Potenziare la Minaccia di un altro o giocargli una Sfiga: +1 Esposizione. A 4, audit del SOC: −1 livello.</span></div></div>`],
-    ['Le carte', `<div class="tdecks">
-        <div class="tdeck"><img class="tback" src="/board/back-ticket.jpg" alt=""><div><h5>Mazzo Ticket</h5><ul>
-          <li><b>Minacce</b> da combattere</li><li><b>Sfighe</b> da giocare sugli altri, quando vuoi</li>
-          <li><b>Ruoli</b>: uno alla volta, ognuno con un potere</li><li><b>Interferenze</b>: forza in più o in meno alla Minaccia</li></ul>
-          <div class="tthumbs"><img src="/cards/threat-certificato-ssl-scaduto.jpg" alt="Minaccia" loading="lazy"><img src="/cards/curse-licenza-scaduta.jpg" alt="Sfiga" loading="lazy"><img src="/cards/role-red.jpg" alt="Ruolo" loading="lazy"><img src="/cards/boost-zero-day-fresco.jpg" alt="Interferenza" loading="lazy"></div></div></div>
-        <div class="tdeck"><img class="tback" src="/board/back-asset.jpg" alt=""><div><h5>Mazzo Asset</h5><ul>
-          <li><b>Equipaggiamento</b>: un asset per slot</li><li><b>Uso singolo</b>: bonus a un combattimento, o Rollback per fuggire</li>
-          <li><b>Carte livello</b>: +1 livello, ma non portano a 10</li></ul>
-          <div class="tslots"><span>Hardware</span><span>Software</span><span>Credenziali</span><span>Gadget</span></div>
-          <div class="tthumbs"><img src="/cards/gear-hw-raspberry-pi-nel-controsoffitto.jpg" alt="Asset" loading="lazy"><img src="/cards/oneshot-caffe-della-macchinetta.jpg" alt="Uso singolo" loading="lazy"><img src="/cards/oneshot-rollback.jpg" alt="Rollback" loading="lazy"><img src="/cards/level-certificazione-appena-presa.jpg" alt="Carta livello" loading="lazy"></div></div></div></div>
-      <div class="tsell"><span>Vendi asset e carte a uso singolo: credito</span><b class="tbig">1000</b><span>= +1 livello (fino al 9)</span></div>
-      <p class="tnote">Si parte con 3 carte Ticket e 2 Asset. Tocca una carta per leggerne l'effetto: la Wiki nelle Regole le ha tutte.</p>`]
+    ["Obiettivo e turno", "/board/tut-1.jpg", "Da livello 1 a 10 (root): vince chi arriva primo. L'ultimo livello solo battendo una Minaccia. Preparati, apri un ticket, se non combatti cerca guai o analizza i log, fine turno massimo 5 carte."],
+    ["Combattimento", "/board/tut-2.jpg", "Tu (livello, asset, uso singolo, chi aiuta) contro la Minaccia (forza e interferenze). Serve più forza; il pareggio lo vince solo il Red Teamer. Vinci livelli e tesori, altrimenti dado per fuggire. Aiuto e sabotaggio."],
+    ["Le carte", "/board/tut-3.jpg", "Mazzo Ticket (Minacce, Sfighe, Ruoli, Interferenze) e mazzo Asset (equipaggiamento per slot, uso singolo, carte livello che non portano a 10). 1000 di credito vale un livello fino al 9. Si parte con 3 Ticket e 2 Asset."]
   ];
   const tut = document.createElement('div');
   tut.id = 'tut'; tut.className = 'hidden';
   tut.innerHTML = `<div class="tbox" role="dialog" aria-modal="true" aria-labelledby="tutT" tabindex="-1">
     <div class="thead"><h3 id="tutT">Come si gioca</h3><button type="button" class="btn ghost" data-t="skip">Salta</button></div>
-    <div class="ttrack">${TUT.map(([t, h], i) => `<section class="tslide" aria-label="Scheda ${i + 1} di ${TUT.length}: ${t}"><h4><span>${i + 1}/${TUT.length}</span> ${t}</h4>${h}</section>`).join('')}</div>
+    <div class="ttrack">${TUT.map(([t, src, alt], i) => `<section class="tslide" aria-label="Scheda ${i + 1} di ${TUT.length}: ${esc(t)}"><img src="${src}" alt="${esc(alt)}"></section>`).join('')}</div>
     <div class="tfoot"><button type="button" class="btn" data-t="prev">← Indietro</button>
       <span class="tdots">${TUT.map((t, i) => `<button type="button" data-t="${i}" aria-label="Scheda ${i + 1}: ${t[0]}"></button>`).join('')}</span>
       <button type="button" class="btn primary" data-t="next">Avanti →</button>
@@ -725,9 +701,11 @@
     track.scrollTo({ left: 0, behavior: 'instant' }); tutSync(); tut.querySelector('.tbox').focus();
   }
   function closeTut() {
+    const wasOpen = !tut.classList.contains('hidden');
     tut.classList.add('hidden'); $('#app').inert = false;
     const back = S.tutBack; S.tutBack = null;
     if (back && typeof back.focus === 'function') try { back.focus(); } catch (e) { /* ignore */ }
+    if (wasOpen && S.view && S.room && S.room.started && !S.view.over) send({ t: 'tutDone' });
   }
   track.addEventListener('scroll', tutSync, { passive: true });
   tut.addEventListener('change', e => store.set('esc-tut-off', e.target.checked));
@@ -826,7 +804,26 @@
         else toast(link, '', 10000);
         return;
       }
-      case 'addBot': return send({ t: 'addBot' });
+      case 'addBot': {
+        const el = document.querySelector('#fBot');
+        const name = el ? el.value : (S.room && S.room.nextBot) || '';
+        S.form.bot = null;
+        return send({ t: 'addBot', name });
+      }
+      case 'renameBot': {
+        const m = S.room.members.find(x => x.id === el.dataset.id);
+        if (!m) return;
+        S.form.botRename = m.name;
+        const id = m.id;
+        return openModal({
+          dismiss: true, title: 'Nome del bot',
+          html: () => `<div class="field"><label for="fRen">Nome</label><input id="fRen" data-f="botRename" maxlength="20" value="${esc(S.form.botRename)}"></div>`,
+          buttons: () => [
+            { label: 'Salva', cls: 'primary', on: () => send({ t: 'renameBot', id, name: S.form.botRename }) },
+            { label: 'Annulla', cls: 'ghost' }
+          ]
+        });
+      }
       case 'remove': return send({ t: 'removeMember', id: el.dataset.id });
       case 'start': return send({ t: 'start' });
       case 'rematch': return send({ t: 'rematch' });
@@ -859,6 +856,7 @@
   // countdown
   setInterval(() => {
     document.querySelectorAll('[data-cd]').forEach(el => {
+      if (el.classList.contains('clock') && S.tut) { el.textContent = 'pausa'; el.classList.remove('urgent'); return; }
       const left = (el.dataset.cd === 'offer' ? S.offerAt : S.deadlineAt) - Date.now();
       el.textContent = mmss(left);
       if (el.classList.contains('clock')) el.classList.toggle('urgent', left < 15000);
