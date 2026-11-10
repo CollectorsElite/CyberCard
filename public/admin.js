@@ -88,7 +88,6 @@
           <li>Stanze max: <b>${cfg.maxRooms}</b> · giocatori ${cfg.minPlayers}–${cfg.maxPlayers}</li>
           <li>BOT_DELAY ${cfg.botDelay}ms · TIMEOUT_SCALE ${cfg.timeoutScale} · grace ${cfg.graceMs}ms</li>
           <li>ROOM_MAX_MS ${cfg.roomMaxMs}</li>
-          <li>Layout mano default: <b>${esc(cfg.handLayoutDefault)}</b> <span class="hint">(fan = impostazione pronta, tema grafico dopo)</span></li>
         </ul>
       </section>`;
 

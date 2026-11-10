@@ -24,6 +24,7 @@
     session: store.get('esc-session'), you: null, room: null, view: null,
     gid: null, lastFx: 0, deadlineAt: 0, offerAt: 0, logOpen: false, modal: null, offerShown: null,
     autopass: store.get('esc-autopass') !== false, apTimer: null, apKey: null,
+    seen: new Set(), shownUid: null,
     form: { name: store.get('esc-name') || '', code: (params.get('r') || '').toUpperCase().slice(0, 5) }
   };
 
@@ -75,6 +76,7 @@
         S.room = m.room; S.you = m.room.you; S.view = m.view; S.tut = m.tut || null;
         if (m.view) {
           const fresh = S.gid !== m.view.gid;
+          if (fresh) { S.seen = new Set(m.view.hand.map(c => c.uid)); S.shownUid = m.view.revealed ? m.view.revealed.card.uid : null; }
           S.gid = m.view.gid;
           S.deadlineAt = m.view.deadlineIn != null ? Date.now() + m.view.deadlineIn : 0;
           S.offerAt = m.view.offerIn != null ? Date.now() + m.view.offerIn : 0;
@@ -111,7 +113,7 @@
     el.className = 'toast ' + cls + (onClick ? ' clickable' : ''); el.textContent = text;
     if (onClick) el.addEventListener('click', onClick);
     box.prepend(el);
-    while (box.children.length > 3) box.lastChild.remove();
+    while (box.children.length > 2) box.lastChild.remove();
     setTimeout(() => el.remove(), ms);
   }
   function handleFx(list, fresh) {
@@ -123,20 +125,13 @@
   function fxToast(e) {
     const me = S.you, q = e.quip ? ' «' + e.quip + '»' : '';
     switch (e.kind) {
-      case 'roll':
-        if (e.pid === me) toast(`Fuga da ${e.threat}: dado ${e.roll} (serviva ${e.need}+). ${e.ok ? 'Ti disconnetti in tempo.' : 'Ti prende: ' + e.bad + '.'}${q}`, e.ok ? 'good' : 'bad', 8000);
-        else toast(`${name(e.pid)} tenta la fuga da ${e.threat}: ${e.roll}, ${e.ok ? 'scappa' : 'preso'}.`);
-        break;
-      case 'window': toast('Finestra aperta: interferisci o passa. Guarda il timer.', 'warn', 7000); break;
-      case 'pass': if (e.pid !== me) toast(`${name(e.pid)} passa.`); break;
-      case 'helpAsk':
-        if (e.target !== me) toast(`${name(e.from)} chiede aiuto a ${name(e.target)} (${e.share} tesori).`);
-        break;
-      case 'sabotage': toast(`Sabotaggio: ${e.text}.${q}`, e.target === me ? 'bad' : 'warn', 7000); break;
+      case 'roll': splashRoll(e); break;
+      // Finestra, passo e richieste tra altri si leggono già su tavolo, badge e registro:
+      // gli avvisi restano per ciò che ti riguarda di persona, così non coprono gli avversari.
+      case 'sabotage': if (e.target === me) toast(`Sabotaggio: ${e.text}.${q}`, 'bad', 7000); break;
       case 'helpNo': if (e.to === me) toast(`${name(e.by)} rifiuta.${q}`, 'warn'); break;
       case 'curse':
         if (e.target === me) toast(`${name(e.by)} ti gioca «${e.card}»: ${e.text}. «${e.d || ''}»`, 'bad', 8000);
-        else if (e.by !== me) toast(`${name(e.by)} gioca «${e.card}» su ${name(e.target)}.`);
         break;
       case 'audit': toast(e.pid === me ? `Audit del SOC: troppe tracce, perdi 1 livello.${q}` : `Audit del SOC su ${name(e.pid)}.${q}`, e.pid === me ? 'bad' : 'warn', 7000); break;
       case 'win': if (e.pid === me) toast(`Minaccia neutralizzata: sei a livello ${e.level}.${q}`, 'good', 7000); break;
@@ -144,6 +139,20 @@
       case 'drawn': toast(`Peschi: ${e.cards.join(', ')}.`, 'good', 6000); break;
       case 'gameover': toast(`${e.winner === me ? 'Hai ottenuto root. Hai vinto.' : name(e.winner) + ' ha ottenuto root.'}${q}`, e.winner === me ? 'good' : 'warn', 10000); break;
     }
+  }
+
+  // Il tiro di fuga si vede: un dado al centro del tavolo, con soglia ed esito.
+  function splashRoll(e) {
+    const mine = e.pid === S.you;
+    const el = document.createElement('div');
+    el.className = 'splash ' + (e.ok ? 'good' : 'bad');
+    el.setAttribute('role', 'status');
+    el.innerHTML = `<p class="splash-k">${mine ? 'Tenti la fuga' : esc(name(e.pid)) + ' tenta la fuga'} da ${esc(e.threat)}</p>
+      <div class="splash-roll"><span class="die" data-v="${+e.roll}" aria-label="Dado: ${+e.roll}">${'<i></i>'.repeat(9)}</span><span class="need">serve ${+e.need}+</span></div>
+      <p class="splash-r">${e.ok ? (mine ? 'Ti disconnetti in tempo.' : 'Scappa.') : (mine ? 'Ti prende: ' : 'Preso: ') + esc(e.bad) + '.'}</p>${e.quip ? `<p class="splash-q">«${esc(e.quip)}»</p>` : ''}`;
+    document.querySelectorAll('.splash').forEach(x => x.remove());
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4200);
   }
 
   /* ================= carte ================= */
@@ -162,10 +171,19 @@
       return '';
     }).join(', ');
   }
+  // Illustrazione ritagliata sulla propria cornice: le percentuali arrivano da /cards.css (art/build-frames.py).
+  const faceHTML = (c, cls = '') => { const a = artSlug(c); return `<span class="face${cls ? ' ' + cls : ''}" data-art="${a}"><img src="/cards/${a}.jpg" alt="" decoding="async" draggable="false"></span>`; };
+  const backHTML = k => `<span class="face" data-art="back-${k}"><img src="/board/back-${k}.jpg" alt="" draggable="false"></span>`;
   function cardHTML(c, opt = {}) {
-    const src = '/cards/' + artSlug(c) + '.jpg';
-    return `<button type="button" class="card k-${c.type}${opt.lg ? ' lg' : ''}${opt.mini ? ' mini' : ''}${opt.sel ? ' sel' : ''}" data-uid="${c.uid}"${opt.m ? ` data-m="${opt.m}"` : ''} aria-label="${esc(c.name)}"><img class="face" src="${src}" alt="">${cardTag(c) ? `<span class="tag">${cardTag(c)}</span>` : ''}</button>`;
+    const cls = ['card', 'k-' + c.type, opt.lg && 'lg', opt.mini && 'mini', opt.sel && 'sel', opt.can && 'can', opt.fresh && 'in'].filter(Boolean).join(' ');
+    return `<button type="button" class="${cls}" data-uid="${c.uid}"${opt.m ? ` data-m="${opt.m}"` : ''} aria-label="${esc(c.name)}">${faceHTML(c)}${cardTag(c) ? `<span class="tag">${cardTag(c)}</span>` : ''}</button>`;
   }
+  // Iniziali per il badge: due parole, altrimenti le prime due lettere.
+  function ini(n) {
+    const w = String(n || '').replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/).filter(Boolean);
+    return ((w.length > 1 ? w[0][0] + w[1][0] : (w[0] || '?').slice(0, 2)) || '?').toUpperCase();
+  }
+  const avaHTML = p => `<span class="ava" data-seat="${p.seat}" aria-hidden="true">${esc(ini(p.name))}</span>`;
   function artSlug(c) {
     const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
     if (c.type === 'levelup') return 'level-' + slug(c.name);
@@ -204,15 +222,14 @@
   }
   function cardDetail(c) {
     if (!c) return '';
-    return `<div class="detail"><img class="zoom" src="/cards/${artSlug(c)}.jpg" alt="${esc(c.name)}">${fxHTML(c)}</div>`;
+    return `<div class="detail">${faceHTML(c, 'zoom')}<div class="detail-t">${fxHTML(c)}</div></div>`;
   }
   const espPips = p => `<span class="esp${p.esp >= V().espMax - 1 ? ' w3' : ''}" title="Esposizione ${p.esp}/${V().espMax}">${Array.from({ length: V().espMax }, (_, i) => `<i class="${i < p.esp ? 'on' : ''}"></i>`).join('')}</span>`;
   const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
   const cd = kind => `<span class="cd" data-cd="${kind}">${mmss((kind === 'offer' ? S.offerAt : S.deadlineAt) - Date.now())}</span>`;
   // Confronto senza i countdown: se il contenuto non cambia non si tocca il DOM (niente tap persi).
   const stable = html => html
-    .replace(/<span class="(?:cd|hud-cd)" data-cd="(\w+)">[^<]*<\/span>/g, '[$1]')
-    .replace(/(<span class="clock"[^>]*>)[^<]*(<\/span>)/g, '$1$2');
+    .replace(/<span class="(?:cd|hud-cd)" data-cd="(\w+)">[^<]*<\/span>/g, '[$1]');
   function paint(el, html, key) {
     const k = stable(html);
     if (el[key] === k) return false;
@@ -220,244 +237,286 @@
   }
 
   /* ================= schermate ================= */
+  // La partita ha uno scheletro fisso; ogni zona si ridisegna solo se il suo contenuto cambia,
+  // così una mossa altrui non tocca la tua mano sotto il dito.
+  const SKELETON = `<div id="board">
+      <div id="stage">
+        <section id="opps" aria-label="Avversari"></section>
+        <section id="table"><div id="piles" aria-label="Mazzi"></div><div id="arena"></div></section>
+        <section id="me" aria-label="La tua postazione"></section>
+        <aside id="log" role="button" tabindex="0" aria-label="Registro della partita"></aside>
+      </div>
+      <section id="handwrap" aria-label="La tua mano"></section>
+      <nav id="actions" aria-label="Azioni"></nav>
+    </div>`;
   function render() {
     const net = $('#netdot');
     net.className = 'dot' + (S.online ? ' on' : '');
     net.setAttribute('aria-label', S.online ? 'Online' : 'Offline');
     $('#bLeave').classList.toggle('hidden', !S.room);
-    document.body.classList.toggle('ingame', !!(S.room && S.room.started && S.view));
+    const ingame = !!(S.room && S.room.started && S.view);
+    document.body.classList.toggle('ingame', ingame);
     const scr = $('#screen');
-    const oldHand = scr.querySelector('.hand'); const hs = oldHand ? oldHand.scrollLeft : 0;
-    const logOld = scr.querySelector('#log'); const ls = logOld ? logOld.scrollTop : 0;
     const ae = document.activeElement;
     const botKeep = ae && ae.dataset && ae.dataset.botid ? { id: ae.dataset.botid, v: ae.value, s: ae.selectionStart, e: ae.selectionEnd } : null;
-    let changed;
-    if (!S.room) { $('#hinfo').textContent = ''; changed = paint(scr, homeHTML(), '_k'); }
-    else if (!S.room.started || !S.view) { $('#hinfo').textContent = 'stanza ' + S.room.code; changed = paint(scr, lobbyHTML(), '_k'); }
-    else {
-      $('#hinfo').textContent = `${S.room.code} · giro ${S.view.turn}`;
-      changed = paint(scr, gameHTML(), '_k');
-    }
-    if (changed) {
-      hidePeek();
-      const h = scr.querySelector('.hand'); if (h) h.scrollLeft = hs;
-      const lg = scr.querySelector('#log'); if (lg) lg.scrollTop = ls;
-      const f = scr.querySelector('#fName'); if (f && document.activeElement === document.body && !S.form.name) f.focus();
-      if (botKeep) {
+    if (!S.room) {
+      $('#hinfo').textContent = '';
+      if (paint(scr, homeHTML(), '_k')) { const f = scr.querySelector('#fName'); if (f && document.activeElement === document.body && !S.form.name) f.focus(); }
+    } else if (!ingame) {
+      $('#hinfo').textContent = 'Stanza ' + S.room.code;
+      if (paint(scr, lobbyHTML(), '_k') && botKeep) {
         const el = scr.querySelector(`[data-botid="${botKeep.id}"]`);
         if (el) { el.value = botKeep.v; el.focus(); try { el.setSelectionRange(botKeep.s, botKeep.e); } catch (err) { /* ignore */ } }
       }
-    }
+    } else renderGame(scr);
+    if (peek._el && !peek._el.isConnected) hidePeek();
     if (S.modal) renderModal();
   }
+  function renderGame(scr) {
+    const v = V(), me = ME(), n = v.players.length;
+    $('#hinfo').textContent = `${S.room.code}, giro ${v.turn}`;
+    paint(scr, SKELETON, '_k');
+    const board = $('#board');
+    board.dataset.n = n;
+    board.classList.toggle('fighting', !!v.combat);
+    const others = Array.from({ length: n - 1 }, (_, i) => v.players[(me.seat + 1 + i) % n]);
+    if (paint($('#opps'), others.map(oppHTML).join(''), '_k')) {
+      const act = $('#opps .opp.active'); // su telefono la fila scorre: chi è di turno resta in vista
+      if (act) { const box = $('#opps'); box.scrollLeft = Math.max(0, act.offsetLeft - (box.clientWidth - act.offsetWidth) / 2); }
+    }
+    paint($('#piles'), pilesHTML(), '_k');
+    paint($('#arena'), arenaHTML(), '_k');
+    S.shownUid = v.revealed ? v.revealed.card.uid : null;
+    const log = $('#log'), ls = log.scrollTop;
+    log.classList.toggle('open', S.logOpen);
+    log.setAttribute('aria-expanded', S.logOpen ? 'true' : 'false');
+    if (paint(log, logHTML(), '_k')) log.scrollTop = ls;
+    $('#me').classList.toggle('active', v.cur === S.you && !v.over);
+    paint($('#me'), meHTML(me), '_k');
+    paint($('#handwrap'), handHTML(), '_k');
+    v.hand.forEach(c => S.seen.add(c.uid));
+    $('#actions').classList.toggle('need', v.needs.includes(S.you) && !v.over);
+    paint($('#actions'), actionsHTML(), '_k');
+  }
 
+  // Cinque carte vere in apertura: il gioco si presenta con quello che ha di più suo.
+  const HERO = ['curse-reset-password-obbligatorio', 'gear-hw-laptop-pieno-di-adesivi', 'threat-ransomware-con-assistenza-clienti', 'role-red', 'oneshot-caffe-della-macchinetta'];
   function homeHTML() {
-    return `<section class="panel"><h2>Gioca con i colleghi</h2>
-      <p class="lead">Card game di sabotaggi e privilege escalation. Vince chi arriva a root per primo; perde chi lascia tracce nei log. Da 3 a 6 giocatori, con bot opzionali per i colleghi che «oggi non riescono».</p>
-      <div class="field"><label for="fName">Il tuo nome</label><input id="fName" data-f="name" maxlength="20" autocomplete="nickname" value="${esc(S.form.name)}"></div>
-      <button class="btn primary" type="button" data-do="create"${S.online ? '' : ' disabled'}>Crea una stanza</button></section>
-      <section class="panel"><h2>Entra in una stanza</h2>
-      <div class="field"><label for="fCode">Codice stanza</label><input id="fCode" data-f="code" maxlength="5" autocapitalize="characters" autocomplete="off" value="${esc(S.form.code)}"></div>
-      <button class="btn" type="button" data-do="join"${S.online ? '' : ' disabled'}>Entra</button></section>
-      ${S.online ? '' : '<p class="hint">Connessione al server in corso…</p>'}`;
+    return `<div class="home">
+      <div class="home-pitch">
+        <div class="herofan" aria-hidden="true">${HERO.map(a => `<span class="card"><span class="face" data-art="${a}"><img src="/cards/${a}.jpg" alt=""></span></span>`).join('')}</div>
+        <h1>Arriva a root prima dei colleghi.</h1>
+        <p class="lead">Card game di sabotaggi e privilege escalation. Vince chi arriva a root per primo; perde chi lascia tracce nei log. Da 3 a 6 giocatori, con bot per i colleghi che «oggi non riescono».</p>
+      </div>
+      <div class="home-forms">
+        <section class="panel"><h2>Crea una stanza</h2>
+          <div class="field"><label for="fName">Il tuo nome</label><input id="fName" data-f="name" maxlength="20" autocomplete="nickname" value="${esc(S.form.name)}"></div>
+          <button class="btn primary" type="button" data-do="create"${S.online ? '' : ' disabled'}>Crea una stanza</button></section>
+        <section class="panel"><h2>Entra in una stanza</h2>
+          <div class="field"><label for="fCode">Codice stanza</label><input id="fCode" class="codein" data-f="code" maxlength="5" autocapitalize="characters" autocomplete="off" spellcheck="false" value="${esc(S.form.code)}"></div>
+          <button class="btn" type="button" data-do="join"${S.online ? '' : ' disabled'}>Entra</button>
+          <p class="hint">Usa il nome scritto qui accanto.</p></section>
+        ${S.online ? '' : '<p class="hint wide">Connessione al server in corso…</p>'}
+      </div></div>`;
   }
 
   function lobbyHTML() {
     const r = S.room, isHost = r.host === S.you, link = location.origin + '/?r=' + r.code;
-    const lis = r.members.map(m => `<li>
+    const seats = r.members.map((m, i) => `<li class="seat" data-seat="${i}">
+      <span class="ava" data-seat="${i}" aria-hidden="true">${esc(ini(m.name))}</span>
       ${isHost && m.isBot
         ? `<input class="botname inline" data-botid="${esc(m.id)}" maxlength="20" value="${esc(m.name)}" aria-label="Nome del bot">`
         : `<span class="nm">${esc(m.name)}</span>`}
-      ${m.id === r.host ? '<span class="badge host">host</span>' : ''}${m.isBot ? '<span class="badge bot">bot</span>' : ''}${!m.connected ? '<span class="badge off">offline</span>' : ''}${m.id === S.you ? '<span class="badge">tu</span>' : ''}
-      ${isHost && m.id !== S.you ? `<button type="button" class="xbtn" data-do="remove" data-id="${esc(m.id)}" aria-label="Rimuovi">✕</button>` : ''}</li>`).join('');
+      <span class="tags">${m.id === S.you ? '<span class="badge you">tu</span>' : ''}${m.id === r.host ? '<span class="badge host">host</span>' : ''}${m.isBot ? '<span class="badge bot">bot</span>' : ''}${!m.connected ? '<span class="badge off">offline</span>' : ''}</span>
+      ${isHost && m.id !== S.you ? `<button type="button" class="xbtn" data-do="remove" data-id="${esc(m.id)}" aria-label="Rimuovi ${esc(m.name)}">✕</button>` : ''}</li>`).join('');
     const n = r.members.length, ready = n >= r.min;
+    const free = Array.from({ length: r.max - n }, (_, i) => `<li class="seat free">${n + i < r.min ? 'Posto da riempire' : 'Posto libero'}</li>`).join('');
     const need = Math.max(0, r.min - n);
     const status = ready
       ? (isHost ? 'Pronti: puoi avviare quando vuoi.' : 'In attesa che l\'host avvii la partita.')
-      : `In attesa di giocatori: ne servono ancora ${need}.`;
-    return `<section class="panel lobby-room">
-        <p class="lobby-kicker">Lobby · attesa giocatori</p>
-        <h2>Stanza <span class="code inline">${esc(r.code)}</span></h2>
+      : `In attesa di giocatori: ${need === 1 ? 'ne serve ancora 1' : 'ne servono ancora ' + need}.`;
+    return `<div class="lobby">
+      <section class="panel lobby-room">
+        <h2>Invita i colleghi</h2>
+        <p class="code" aria-label="Codice stanza ${esc(r.code.split('').join(' '))}">${esc(r.code)}</p>
         <p class="link">${esc(link)}</p>
-        <div class="row"><button class="btn" type="button" data-do="copy">Copia link d'invito</button></div>
+        <button class="btn" type="button" data-do="copy">Copia link d'invito</button>
       </section>
       <section class="panel lobby-players">
-        <h2>Giocatori ${n}/${r.max}</h2>
-        <div class="lobby-meter" role="progressbar" aria-valuemin="0" aria-valuemax="${r.max}" aria-valuenow="${n}" aria-label="Posti occupati">
-          <i data-n="${n}" data-max="${r.max}"></i>
-          <span class="lobby-meter-mark" title="minimo ${r.min}"></span>
-        </div>
+        <h2>Al tavolo <span class="count">${n}/${r.max}</span></h2>
         <p class="lobby-status${ready ? ' ready' : ''}">${esc(status)}</p>
-        <ul class="members">${lis}</ul>
+        <ul class="members">${seats}${free}</ul>
         ${isHost ? `<div class="row lobby-host">
             <input id="fBot" class="botname" data-f="bot" maxlength="32" aria-label="Nome del bot" value="${esc(S.form.bot != null ? S.form.bot : (r.nextBot || ''))}"${n >= r.max ? ' disabled' : ''}>
             <button class="btn" type="button" data-do="addBot"${n >= r.max ? ' disabled' : ''}>Aggiungi un bot</button>
-            <button class="btn primary" type="button" data-do="start"${!ready ? ' disabled' : ''}>Avvia la partita</button>
           </div>
-          ${!ready ? `<p class="hint">Minimo ${r.min} posti: invita con il link oppure riempi con bot.</p>` : `<p class="hint">Puoi ancora aggiungere bot fino a ${r.max} giocatori.</p>`}`
-          : `<p class="hint">Solo l'host può avviare. Ricarica se hai perso la connessione.</p>`}
-      </section>`;
-  }
-
-  function gameHTML() {
-    const v = V(), me = ME();
-    const n = v.players.length;
-    const others = Array.from({ length: n - 1 }, (_, i) => v.players[(me.seat + 1 + i) % n]);
-    return `<div id="board">
-      <div class="board-bar">
-        <div class="piles" aria-label="Mazzi">
-          <div class="pile t" title="Mazzo Ticket" aria-label="Mazzo Ticket: ${v.deck.T} carte"><b>${v.deck.T}</b></div>
-          <div class="pile a" title="Mazzo Asset" aria-label="Mazzo Asset: ${v.deck.A} carte"><b>${v.deck.A}</b></div>
-        </div>
-        <span class="clock${S.tut ? ' hold' : (S.deadlineAt - Date.now()) < 15000 ? ' urgent' : ''}" data-cd="main" aria-label="Tempo rimasto">${S.tut ? 'pausa' : mmss(S.deadlineAt - Date.now())}</span>
-      </div>
-      ${S.tut ? `<p class="tutwait">In attesa che tutti chiudano le istruzioni (${S.tut.ready}/${S.tut.total})</p>` : ''}
-      <section id="opps" aria-label="Avversari">${others.map(oppHTML).join('')}</section>
-      <section id="table">${tickerHTML()}${bubblesHTML()}${tableHTML()}</section>
-      <section id="me" class="${v.cur === S.you && !v.over ? ' active' : ''}">${meHTML(me)}</section>
-      <section id="log" class="${S.logOpen ? ' open' : ''}" role="button" tabindex="0" aria-expanded="${S.logOpen ? 'true' : 'false'}" title="Tocca per espandere">${(S.logOpen ? v.log.slice().reverse() : v.log.slice(-5).reverse()).map(r => `<div class="l ${esc(r.cls)}">${esc(r.t)}</div>`).join('')}</section>
-      <nav id="actions">${actionsHTML()}</nav>
-    </div>`;
-  }
-  function tickerHTML() {
-    const rows = (V().log || []).filter(r => r.cls !== 'quip').slice(-4);
-    if (!rows.length) return '';
-    return `<ol class="ticker" aria-live="polite">${rows.map(r => `<li class="${esc(r.cls)}">${esc(r.t)}</li>`).join('')}</ol>`;
-  }
-  function bubblesHTML() {
-    const v = V(), log = v.log || [];
-    const names = v.players.map(p => p.name).sort((a, b) => b.length - a.length);
-    const items = [];
-    log.forEach((r, i) => {
-      if (r.cls !== 'quip') return;
-      const prev = (log[i - 1] && log[i - 1].t) || '';
-      const who = names.find(n => prev.startsWith(n)) || '';
-      items.push({ who, t: String(r.t).replace(/^«\s*|\s*»$/g, '') });
-    });
-    const last = items.slice(-2);
-    if (!last.length) return '';
-    const me = ME();
-    return `<div class="bubbles" aria-live="polite">${last.map(b => `<div class="bubble${b.who && me && b.who === me.name ? ' mine' : ''}">${b.who ? `<span class="bw">${esc(b.who)}</span>` : ''}${esc(b.t)}</div>`).join('')}</div>`;
+          <button class="btn primary big" type="button" data-do="start"${!ready ? ' disabled' : ''}>Avvia la partita</button>
+          <p class="hint">${!ready ? `Servono almeno ${r.min} giocatori: invita con il link oppure riempi i posti con dei bot.` : `Puoi ancora aggiungere bot fino a ${r.max} giocatori.`}</p>`
+          : `<p class="hint">Solo l'host può avviare la partita.</p>`}
+      </section></div>`;
   }
 
   function oppHTML(p) {
     const v = V(), c = v.combat, m = member(p.id);
-    let st = '<span class="st"></span>';
+    const turn = v.cur === p.id && !v.over;
+    let st = '';
     if (c) {
       if (p.id === c.fighter) st = `<span class="st fight">combatte${c.step === 'window' && passed(p.id) ? ' ✓' : ''}</span>`;
       else if (p.id === c.helper) st = `<span class="st help">aiuta${c.step === 'window' && passed(p.id) ? ' ✓' : ''}</span>`;
       else if (c.offer && c.offer.to === p.id) st = '<span class="st wait">valuta aiuto</span>';
-      else if (c.step === 'window') st = passed(p.id) ? '<span class="st ok">passo</span>' : '<span class="st wait">decide</span>';
-    } else if (v.cur === p.id && !v.over) st = '<span class="st wait">di turno</span>';
+      else if (c.step === 'window') st = passed(p.id) ? '<span class="st ok">passo ✓</span>' : '<span class="st wait">decide</span>';
+    } else if (v.over && v.winner === p.id) st = '<span class="st ok">root</span>';
+    else if (turn) st = '<span class="st wait">di turno</span>';
     const off = m && !m.connected, gear = p.gear || {};
-    return `<div class="opp${v.cur === p.id && !v.over ? ' active' : ''}${off ? ' off' : ''}" data-pid="${esc(p.id)}">${st}
-      <div class="on">${esc(p.name)}${p.isBot ? ' <span class="badge bot">bot</span>' : off ? ' <span class="badge off">offline</span>' : ''}</div>
-      <div class="ol"><span class="lvl">${p.level}</span><span class="tt">${esc(p.title)}</span></div>
-      <div class="ostats"><span><small>Forza</small><b>${p.power - p.penalty}</b></span><span><small>Carte</small><b>${p.handCount}</b></span><span><small>Esp.</small>${espPips(p)}</span></div>
-      <div class="orole">${p.role ? esc(p.role.name) : 'nessun ruolo'}</div>
-      <div class="minis">${p.role ? cardHTML(p.role, { mini: true }) : ''}${Object.keys(SLOTS).map(s => gear[s] ? cardHTML(gear[s], { mini: true }) : `<span class="oslot" title="${SLOTS[s]}: vuoto">${s.toUpperCase()}</span>`).join('')}</div></div>`;
+    return `<div class="opp${turn ? ' active' : ''}${off ? ' off' : ''}" data-pid="${esc(p.id)}" data-seat="${p.seat}" role="button" tabindex="0" aria-label="${esc(p.name)}, livello ${p.level}">${st}
+      <div class="id">${avaHTML(p)}
+        <div class="who"><div class="on">${esc(p.name)}</div><div class="tt">${esc(p.title)}${p.isBot ? ' <span class="badge bot">bot</span>' : off ? ' <span class="badge off">offline</span>' : ''}</div></div>
+        <span class="lvl" title="Livello">${p.level}</span></div>
+      <div class="ostats"><span><small>Forza</small><b>${p.power - p.penalty}</b></span><span><small>Carte</small><b>${p.handCount}</b></span><span class="oesp"><small><span class="lg-only">Esposizione</span><span class="sm-only" title="Esposizione">Esp.</span></small>${espPips(p)}</span></div>
+      <div class="minis">${p.role ? cardHTML(p.role, { mini: true }) : '<span class="oslot" title="Nessun ruolo">Ruolo</span>'}${Object.keys(SLOTS).map(s => gear[s] ? cardHTML(gear[s], { mini: true }) : `<span class="oslot" title="${SLOTS[s]}: vuoto">${s.toUpperCase()}</span>`).join('')}</div></div>`;
   }
 
-  function tableHTML() {
+  // Il mazzo Ticket è anche un comando: nel tuo turno ci clicchi sopra per aprire un ticket o analizzare i log.
+  function pilesHTML() {
+    const v = V(), mine = v.cur === S.you && !v.combat && !v.over && !S.tut;
+    const d = mine && v.phase === 'open' ? 'open' : mine && v.phase === 'after' ? 'loot' : '';
+    const tip = d === 'open' ? 'Apri un ticket' : d === 'loot' ? 'Analizza i log' : '';
+    return `<${d ? `button type="button" data-do="${d}"` : 'div'} class="pile t${d ? ' can' : ''}" aria-label="Mazzo Ticket: ${v.deck.T} carte${tip ? '. ' + tip : ''}">${backHTML('ticket')}<b>${v.deck.T}</b><small>${tip || 'Ticket'}</small></${d ? 'button' : 'div'}>
+      <div class="pile a" aria-label="Mazzo Asset: ${v.deck.A} carte">${backHTML('asset')}<b>${v.deck.A}</b><small>Asset</small></div>`;
+  }
+
+  const hud = (k, m, cls = '') => `<div class="hud${cls}" role="status"><span class="hud-k">${k}</span><span class="hud-m">${m}</span></div>`;
+  function arenaHTML() {
     const v = V(), c = v.combat, me = ME();
     if (c) {
       const f = P(c.fighter), h = c.helper ? P(c.helper) : null;
-      const fdet = [`liv ${f.level}`, `asset +${sumGear(f)}`];
+      const fdet = [`livello ${f.level}`, `asset +${sumGear(f)}`];
       if (c.fBonus) fdet.push(`bonus +${c.fBonus}`);
       if (f.penalty) fdet.push(`policy −${f.penalty}`);
       if (h) fdet.push(`${h.name} +${h.power}`);
-      const mdet = c.threats.map(t => `${esc(t.card.name)}: ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`);
-      if (c.mBonus) mdet.push(`bonus +${c.mBonus}`);
-      let status = '';
-      let hudK = 'COMBATTIMENTO', hudM = '';
-      if (c.step === 'prep') {
-        status = `${esc(f.name)} si prepara. Poi si apre la finestra per gli altri.`;
-        hudK = 'PREPARAZIONE'; hudM = status;
-      } else if (c.step === 'window') {
-        const waiting = v.players.filter(p => !passed(p.id)).map(p => p.name);
-        status = `Finestra aperta · mancano: ${esc(waiting.join(', ') || 'nessuno')}`;
-        hudK = 'FINESTRA'; hudM = passed(S.you) ? 'Hai passato. Se qualcuno gioca, dovrai decidere di nuovo.' : 'Interferisci (carta) o passa. Il timer è quello qui a destra.';
-      } else if (c.step === 'flee') {
-        status = `${esc(f.name)} deve tentare la fuga.`;
-        hudK = 'FUGA'; hudM = status;
-      }
-      if (c.offer) {
-        const ask = `${esc(name(c.offer.from))} chiede aiuto a ${esc(name(c.offer.to))} per ${c.offer.share} ${pl(c.offer.share, 'tesoro', 'tesori')}`;
-        status += `<br>${ask} · ${cd('offer')}`;
-        hudK = 'AIUTO'; hudM = ask;
-      }
-      const youNeed = v.needs.includes(S.you);
-      const hudCd = c.offer && c.offer.to === S.you ? 'offer' : 'main';
-      return `<div class="hud${youNeed ? ' need' : ''}${c.step === 'window' ? ' win' : ''}" role="status">
-        <span class="hud-k">${hudK}</span>
-        <span class="hud-m">${hudM}</span>
-        <span class="hud-cd" data-cd="${hudCd}">${mmss((hudCd === 'offer' ? S.offerAt : S.deadlineAt) - Date.now())}</span>
-      </div>
-      <div class="fight">
-        <div class="zone side f"><p class="zone-lab">Chi combatte</p><div class="lab">${esc(f.name)}${h ? ' + ' + esc(h.name) : ''}</div><div class="pow">${c.fighterPower}</div><div class="det">${fdet.map(esc).join('<br>')}</div></div>
-        <div class="vs ${c.winning ? 'w' : 'l'}">${c.winning ? 'VINCE' : 'PERDE'}</div>
-        <div class="zone side m"><p class="zone-lab">Minacce</p><div class="lab">${c.threats.length > 1 ? 'Minacce' : 'Minaccia'}</div><div class="pow">${c.threatPower}</div><div class="cardrow">${c.threats.map(t => cardHTML(t.card)).join('')}</div><div class="det">${mdet.join('<br>')}</div></div></div>
-        <div class="stake">In palio: +${c.levels} ${pl(c.levels, 'livello', 'livelli')} · ${c.treasures} ${pl(c.treasures, 'tesoro', 'tesori')}${h ? ` (${c.share} a ${esc(h.name)})` : ''}</div>
-        <div class="wstat">${status}</div>
-        ${c.ev.length ? '<ul class="ev">' + c.ev.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>' : ''}`;
+      const multi = c.threats.length > 1;
+      const mdet = multi ? c.threats.map(t => `${t.card.name} ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`) : c.threats.map(t => `forza ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`);
+      if (c.mBonus) mdet.push(`interferenze ${c.mBonus > 0 ? '+' : ''}${c.mBonus}`);
+      let k = 'Combattimento', m = '';
+      const mineFight = c.fighter === S.you;
+      if (c.step === 'prep') { k = 'Preparazione'; m = mineFight ? 'Usa carte o chiedi aiuto, poi combatti.' : `${esc(f.name)} si prepara. Poi tocca a tutti dire «passo».`; }
+      else if (c.step === 'window') {
+        // chi manca si legge sui badge («decide» / «passo»): qui basta il conto, o i nomi se sono pochi
+        const waiting = v.players.filter(p => !passed(p.id)).map(p => p.id === S.you ? 'tu' : p.name);
+        const left = waiting.length > 2 ? `Devono ancora decidere in ${waiting.length}.` : `${waiting.length === 1 ? 'Manca' : 'Mancano'} ${esc(waiting.join(' e ') || 'nessuno')}.`;
+        k = 'Finestra di interferenza';
+        m = passed(S.you) ? `Hai passato. ${left}` : `Gioca una carta o passa. ${left}`;
+      } else if (c.step === 'flee') { k = 'Fuga'; m = mineFight ? 'Sei in svantaggio: tira il dado.' : `${esc(f.name)} deve tentare la fuga.`; }
+      if (c.offer) { k = 'Richiesta di aiuto'; m = `${esc(name(c.offer.from))} chiede aiuto a ${esc(name(c.offer.to))} per ${c.offer.share} ${pl(c.offer.share, 'tesoro', 'tesori')}. Risposta entro ${cd('offer')}`; }
+      const diff = Math.abs(c.fighterPower - c.threatPower);
+      return `${hud(k, m, (v.needs.includes(S.you) ? ' need' : '') + (c.step === 'window' ? ' win' : ''))}
+        <div class="duel${multi ? ' multi' : ''}">
+          <div class="side f"><div class="side-h">${avaHTML(f)}${h ? avaHTML(h) : ''}<span class="lab">${esc(f.name)}${h ? ' + ' + esc(h.name) : ''}</span></div><div class="pow">${c.fighterPower}</div><div class="det">${fdet.map(x => `<span>${esc(x)}</span>`).join('')}</div></div>
+          <div class="vs ${c.winning ? 'w' : 'l'}"><span class="burst" aria-hidden="true">VS</span><b>${c.winning ? 'vince' : 'perde'}</b><small>${diff ? 'di ' + diff : 'in pareggio'}</small></div>
+          <div class="side m"><div class="side-h"><span class="lab">${multi ? 'Minacce' : esc(c.threats[0].card.name)}</span></div><div class="pow">${c.threatPower}</div><div class="det">${mdet.map(x => `<span>${esc(x)}</span>`).join('')}</div></div>
+          <div class="threats">${c.threats.map(t => cardHTML(t.card, { lg: true })).join('')}</div>
+        </div>
+        <p class="stake">In palio: <b>+${c.levels} ${pl(c.levels, 'livello', 'livelli')}</b> e <b>${c.treasures} ${pl(c.treasures, 'tesoro', 'tesori')}</b>${h ? ` (${c.share} a ${esc(h.name)})` : ''}</p>`;
     }
-    let hint;
-    if (v.over) hint = v.winner === S.you ? '<b>Hai ottenuto root. Hai vinto.</b> Ora la reperibilità è tua.' : `<b>${esc(name(v.winner))}</b> ha ottenuto root. Partita finita. Cambiate le password.`;
+    if (v.over) {
+      const rank = v.players.slice().sort((a, b) => (b.id === v.winner) - (a.id === v.winner) || b.level - a.level);
+      return `${hud(v.winner === S.you ? 'Hai vinto' : 'Partita finita', v.winner === S.you ? 'Hai ottenuto root. Ora la reperibilità è tua.' : `${esc(name(v.winner))} ha ottenuto root. Cambiate le password.`, ' over')}
+        <div class="finale"><span class="burst big" aria-hidden="true">root</span>
+          <ol class="rank">${rank.map(p => `<li${p.id === v.winner ? ' class="first"' : ''}>${avaHTML(p)}<span class="nm">${esc(p.name)}</span><span class="tt">${esc(p.title)}</span><b>${p.level}</b></li>`).join('')}</ol></div>`;
+    }
+    let k, m, cls = '';
+    if (S.tut) { k = 'In pausa'; m = `In attesa che tutti chiudano le istruzioni (${S.tut.ready}/${S.tut.total}).`; }
     else if (v.cur === me.id) {
-      hint = {
-        open: '<b>Il tuo turno.</b> Equipaggia, assumi un ruolo, usa i livelli: poi apri un ticket. Qualcuno deve pur farlo.',
-        after: '<b>Ticket tranquillo.</b> Puoi cercare guai (tocca una Minaccia in mano), analizzare i log o chiudere il turno prima che arrivi altro.',
-        end: '<b>Chiudi il turno</b> quando hai finito.'
+      k = 'Il tuo turno'; cls = ' need';
+      m = {
+        open: 'Equipaggia, assumi un ruolo, usa i livelli. Poi apri un ticket: qualcuno deve pur farlo.',
+        after: 'Ticket tranquillo. Puoi cercare guai (tocca una Minaccia in mano), analizzare i log o chiudere il turno.',
+        end: 'Chiudi il turno quando hai finito.'
       }[v.phase] || '';
-      hint += ` <span class="hint">${cd('main')}</span>`;
-    } else hint = `Turno di <b>${esc(name(v.cur))}</b>. Intanto puoi equipaggiarti, e le Sfighe puoi giocarle in qualsiasi momento.`;
-    const rv = v.revealed ? `<div class="zone revealed"><p class="zone-lab">Ticket aperto</p>${cardHTML(v.revealed.card)}<div class="hintbig">da ${esc(name(v.revealed.by))}</div></div>` : '<div class="zone empty-zone"><p class="zone-lab">Ticket</p><p class="hint">Nessuna carta scoperta.</p></div>';
-    return `<div class="hintbig">${hint}</div>${rv}`;
+    } else { k = `Turno di ${esc(name(v.cur))}`; m = 'Intanto puoi equipaggiarti. Le Sfighe si giocano in qualsiasi momento.'; }
+    const r = v.revealed;
+    const rv = r
+      ? `<figure class="shown">${cardHTML(r.card, { lg: true, fresh: r.card.uid !== S.shownUid })}<figcaption><b class="shown-n">${esc(r.card.name)}</b>${fxHTML(r.card)}<p class="by">Ticket aperto da ${esc(name(r.by))}</p></figcaption></figure>`
+      : `<div class="spot"><span>Il prossimo ticket finisce qui</span></div>`;
+    return `${hud(k, m, cls)}<div class="play">${rv}</div>`;
+  }
+
+  // Registro: l'ultima riga in alto. Le battute diventano fumetti di chi ha appena agito.
+  function logHTML() {
+    const v = V(), log = v.log || [];
+    const names = v.players.map(p => p.name).sort((a, b) => b.length - a.length);
+    const rows = [];
+    log.slice(-40).forEach((r, i, a) => {
+      if (r.cls !== 'quip') { rows.push(`<li class="l ${esc(r.cls)}">${esc(r.t)}</li>`); return; }
+      const prev = (a[i - 1] && a[i - 1].t) || '';
+      const who = names.find(n => prev.startsWith(n)) || '';
+      rows.push(`<li class="l quip${who && who === ME().name ? ' mine' : ''}"><span class="bubble">${esc(String(r.t).replace(/^«\s*|\s*»$/g, ''))}</span></li>`);
+    });
+    return `<h3>Registro</h3><ol class="feed" aria-live="polite">${rows.reverse().join('')}</ol>`;
   }
 
   function meHTML(me) {
-    const v = V();
-    return `<div class="mehead">
-        <div class="lvlbox"><div class="big">${me.level}</div><div class="tt">${esc(me.title)}</div></div>
-        <div class="stats"><div>Forza <b>${me.power - me.penalty}</b>${me.penalty ? ` <span class="r">(policy −${me.penalty})</span>` : ''}</div>
-        <div>Credito <b>${me.credit}</b>/1000</div><div>Esposizione ${espPips(me)}</div></div>
-        <button type="button" class="rolechip" data-role="1">${me.role ? esc(me.role.name) + (me.blueReady ? ' · scudo' : '') : 'Nessun ruolo'}</button></div>
-      <div class="slots">${Object.keys(SLOTS).map(s => { const g = me.gear[s]; return `<button type="button" class="slot${g ? ' full' : ''}" data-slot="${s}"><span class="sl">${SLOTS[s]}</span>${g ? `<img class="face mini" src="/cards/${artSlug(g)}.jpg" alt="">` + `<span class="sb">+${me.gearBonus[s]}</span>` : '<span class="sn empty">vuoto</span>'}</button>`; }).join('')}</div>
-      <div class="handhead">La tua mano · <span class="${v.hand.length > v.handMax ? 'r' : ''}">${v.hand.length}/${v.handMax}</span>${v.hand.length > v.handMax ? ' · a fine turno scegli cosa scartare' : ''}</div>
-      <div class="hand" data-hand-layout="${esc(store.get('esc-hand-layout') || 'fan')}" data-n="${v.hand.length}">${v.hand.map(c => cardHTML(c)).join('') || '<span class="hintbig">Mano vuota.</span>'}</div>`;
+    const cr = Math.max(0, Math.min(10, Math.floor(me.credit / 100)));
+    const slot = s => {
+      const g = me.gear[s];
+      return `<button type="button" class="slot${g ? ' full' : ''}" data-slot="${s}" aria-label="${SLOTS[s]}${g ? ': ' + esc(g.name) + ', +' + me.gearBonus[s] : ': vuoto'}">${g ? faceHTML(g) + `<span class="sb">+${me.gearBonus[s]}</span>` : ''}<span class="sl">${SLOTS[s]}</span></button>`;
+    };
+    return `<div class="id" data-seat="${me.seat}">${avaHTML(me)}
+        <div class="who"><div class="on">${esc(me.name)}</div><div class="tt">${esc(me.title)}</div></div>
+        <span class="lvl" title="Livello">${me.level}</span></div>
+      <div class="stats">
+        <span><small>Forza</small><b>${me.power - me.penalty}${me.penalty ? `<em class="r" title="Penalità al prossimo combattimento">policy −${me.penalty}</em>` : ''}</b></span>
+        <span class="credit"><small>Credito</small><b>${me.credit}</b><i class="bar c${cr}" title="1000 di credito valgono un livello"></i></span>
+        <span><small>Esposizione</small>${espPips(me)}</span></div>
+      <div class="slots"><button type="button" class="slot role${me.role ? ' full' : ''}" data-role="1" aria-label="Ruolo: ${me.role ? esc(me.role.name) : 'nessuno'}">${me.role ? faceHTML(me.role) + (me.blueReady ? '<span class="sb">scudo</span>' : '') : ''}<span class="sl">${me.role ? esc(me.role.name) : 'Ruolo'}</span></button>${Object.keys(SLOTS).map(slot).join('')}</div>`;
+  }
+
+  // Evidenzia le carte che in questo momento hanno un uso legato alla situazione (non la normale gestione).
+  function playableNow(card) {
+    const v = V(), c = v.combat;
+    if (v.over) return false;
+    if (!c) return card.type === 'threat' && v.cur === S.you && v.phase === 'after';
+    if (card.type === 'oneshot' && card.escape) return c.step === 'flee' && c.fighter === S.you;
+    if (!((c.step === 'prep' && (c.fighter === S.you || c.helper === S.you)) || c.step === 'window')) return false;
+    return card.type === 'oneshot' || card.type === 'boost' || (card.type === 'lateral' && v.hand.some(x => x.type === 'threat'));
+  }
+  function handHTML() {
+    const v = V(), over = v.hand.length > v.handMax && !v.over;
+    return `<div class="handhead"><span>La tua mano</span><b class="${over ? 'r' : ''}">${v.hand.length}/${v.handMax}</b>${over ? '<span class="r">a fine turno scegli cosa scartare</span>' : ''}</div>
+      <div class="hand" data-n="${Math.min(v.hand.length, 12)}">${v.hand.map(c => cardHTML(c, { can: playableNow(c), fresh: !S.seen.has(c.uid) })).join('') || '<span class="hintbig">Mano vuota.</span>'}</div>`;
   }
 
   function actionsHTML() {
     const v = V(), c = v.combat, me = S.you, isHost = S.room.host === me;
     const B = (d, label, cls = '', dis = false) => `<button type="button" class="btn ${cls}" data-do="${d}"${dis ? ' disabled' : ''}>${esc(label)}</button>`;
-    const H = t => `<span class="hint">${t}</span>`;
-    if (v.over) return (isHost ? B('rematch', 'Rivincita', 'primary') : H('In attesa che l\'host proponga la rivincita.')) + B('leave', 'Esci', 'ghost');
+    const out = (hint, btns = '') => `<div class="dock-top">${v.over ? '' : S.tut ? '<span class="hud-cd hold">pausa</span>' : `<span class="hud-cd" data-cd="main">${mmss(S.deadlineAt - Date.now())}</span>`}<p class="hint">${hint}</p></div>${btns ? `<div class="btns">${btns}</div>` : ''}`;
+    if (v.over) return out(isHost ? 'Stessa stanza, stessi colleghi.' : 'In attesa che l\'host proponga la rivincita.', (isHost ? B('rematch', 'Rivincita', 'primary') : '') + B('leave', 'Esci', 'ghost'));
     if (c) {
-      if (c.offer && c.offer.to === me) return H(`${esc(name(c.offer.from))} ti chiede aiuto · ${cd('offer')}`);
+      if (c.offer && c.offer.to === me) return out(`${esc(name(c.offer.from))} ti chiede aiuto. Rispondi entro ${cd('offer')}`);
       const fighter = c.fighter === me, canAsk = fighter && !c.helper && !c.offer;
       if (c.step === 'prep') {
-        if (fighter) return H(`Prima di combattere puoi usare carte o chiedere aiuto. Poi si apre la finestra per gli altri. ${cd('main')}`) + (canAsk ? B('help', 'Chiedi aiuto') : '') + B('fight', 'Combatti', 'primary');
-        return H(`${esc(name(c.fighter))} si prepara. Potrai interferire quando si apre la finestra.`);
+        if (fighter) return out('Prima di combattere puoi usare carte o chiedere aiuto. Poi si apre la finestra per gli altri.', (canAsk ? B('help', 'Chiedi aiuto') : '') + B('fight', 'Combatti', 'primary'));
+        return out(`${esc(name(c.fighter))} si prepara. Potrai interferire quando si apre la finestra.`);
       }
       if (c.step === 'window') {
-        if (passed(me)) return H(`Hai passato. Ora guardi e basta, come in ogni post-mortem. Se qualcuno gioca una carta dovrai decidere di nuovo. ${cd('main')}`);
-        if (canAutopass()) return H(`Non hai carte da combattimento: passo automatico tra pochi secondi. ${cd('main')}`) + B('pass', 'Passo ora', 'primary');
+        if (passed(me)) return out('Hai passato. Ora guardi e basta, come in ogni post-mortem. Se qualcuno gioca una carta dovrai decidere di nuovo.');
+        if (canAutopass()) return out('Non hai carte da combattimento: passo automatico tra pochi secondi.', B('pass', 'Passo ora', 'primary'));
         const extra = fighter && c.offer && c.offer.from === me ? B('cancelHelp', 'Annulla richiesta', 'ghost') : canAsk ? B('help', 'Chiedi aiuto') : '';
         const label = fighter ? (c.winning ? 'Passo: chiudo e vinco' : 'Passo: vado alla fuga') : 'Passo';
         const tip = fighter ? (c.winning ? 'Sei in vantaggio. Gli altri possono ancora sabotarti finché non passano tutti.' : 'Sei in svantaggio: gioca carte o chiedi aiuto prima di passare.')
           : c.winning ? `${esc(name(c.fighter))} sta vincendo: tocca una carta per sabotare (+1 Esposizione) oppure passa.` : `${esc(name(c.fighter))} sta perdendo. Puoi passare, o aiutarlo con una carta.`;
-        return H(`${tip} ${cd('main')}`) + extra + B('pass', label, 'primary');
+        return out(tip, extra + B('pass', label, 'primary'));
       }
-      if (c.step === 'flee' && fighter) return H(`Sei in svantaggio: tira il dado e spera che la VPN cada al momento giusto. Se hai un Rollback toccalo nella mano. ${cd('main')}`) + B('flee', 'Tenta la fuga', 'danger');
-      return H(`${esc(name(c.fighter))} tenta la fuga…`);
+      if (c.step === 'flee' && fighter) return out('Tira il dado e spera che la VPN cada al momento giusto. Se hai un Rollback, toccalo nella mano.', B('flee', 'Tenta la fuga', 'danger'));
+      return out(`${esc(name(c.fighter))} tenta la fuga…`);
     }
     if (v.cur === me) {
-      if (v.phase === 'open') return B('open', 'Apri un ticket', 'primary');
-      if (v.phase === 'after') return B('loot', 'Analizza i log') + B('endTurn', 'Fine turno', 'ghost');
+      if (v.phase === 'open') return out('Tocca a te.', B('open', 'Apri un ticket', 'primary'));
+      if (v.phase === 'after') return out('Niente combattimento in questo turno.', B('endTurn', 'Fine turno') + B('loot', 'Analizza i log', 'primary'));
       const ex = v.hand.length - v.handMax;
-      return B('endTurn', ex > 0 ? `Fine turno (scarti ${ex})` : 'Fine turno', 'primary');
+      return out(ex > 0 ? `Hai ${ex} ${pl(ex, 'carta', 'carte')} di troppo.` : 'Hai finito?', B('endTurn', ex > 0 ? `Fine turno (scarti ${ex})` : 'Fine turno', 'primary'));
     }
-    return H(`Turno di ${esc(name(v.cur))}…`);
+    return out(`Turno di ${esc(name(v.cur))}.`);
   }
 
   /* ================= modali ================= */
@@ -477,7 +536,7 @@
     if (!m) return;
     const btns = m.buttons();
     m._btns = btns;
-    paint(el, `<div class="mbox" role="dialog" aria-modal="true"><h3>${esc(typeof m.title === 'function' ? m.title() : m.title)}</h3><div class="mbody">${m.html()}</div>
+    paint(el, `<div class="mbox${m.cls ? ' ' + m.cls : ''}" role="dialog" aria-modal="true"><h3>${esc(typeof m.title === 'function' ? m.title() : m.title)}</h3><div class="mbody">${m.html()}</div>
       <div class="mbtns">${btns.map((b, i) => `<button type="button" class="btn ${b.cls || ''}" data-mi="${i}"${b.disabled ? ' disabled' : ''}>${esc(b.label)}</button>`).join('')}</div></div>`, '_k');
     el.classList.remove('hidden');
   }
@@ -511,7 +570,7 @@
     const find = () => (where === 'hand' ? V().hand.find(c => c.uid === uid) : where === 'slot' ? Object.values(ME().gear).find(g => g && g.uid === uid) : where === 'role' ? ME().role : null);
     const card = () => (where === 'view' ? findPublic(uid) : find());
     openModal({
-      dismiss: true,
+      dismiss: true, cls: 'sheet',
       title: () => (card() || {}).name || '',
       valid: () => !!card(),
       html: () => cardDetail(card()),
@@ -620,7 +679,7 @@
   function openDiscardModal() {
     const st = { sel: new Set() };
     openModal({
-      dismiss: true, title: 'Limite di mano',
+      dismiss: true, cls: 'wide', title: 'Limite di mano',
       valid: () => { const v = V(); return !!(v && v.cur === S.you && !v.combat && v.hand.length > v.handMax); },
       html: () => {
         const v = V(), ex = v.hand.length - v.handMax;
@@ -639,10 +698,10 @@
       dismiss: true, title: () => name(pid), valid: () => !!(V() && P(pid)),
       html: () => {
         const p = P(pid), gs = Object.entries(p.gear).filter(([, g]) => g);
-        return `<p>Livello ${p.level} (${esc(p.title)}) · forza ${p.power} · esposizione ${p.esp}/${V().espMax} · credito ${p.credit}</p>
-          <p>Ruolo: ${p.role ? esc(p.role.name) + ' — ' + esc((ROLES[p.role.role] || { text: '' }).text) : 'nessuno'}</p>
-          <p>Asset equipaggiati:</p><ul class="gearlist">${gs.length ? gs.map(([s, g]) => `<li>${esc(g.name)} (+${p.gearBonus[s]}, ${SLOTS[s]})</li>`).join('') : '<li>nessuno</li>'}</ul>
-          <p>Carte in mano: ${p.handCount}</p>`;
+        return `<div class="oppcard"><div class="id" data-seat="${p.seat}">${avaHTML(p)}<div class="who"><div class="on">${esc(p.name)}</div><div class="tt">${esc(p.title)}</div></div><span class="lvl">${p.level}</span></div>
+          <dl class="facts"><div><dt>Forza</dt><dd>${p.power - p.penalty}</dd></div><div><dt>Carte in mano</dt><dd>${p.handCount}</dd></div><div><dt>Credito</dt><dd>${p.credit}</dd></div><div><dt>Esposizione</dt><dd>${p.esp}/${V().espMax}</dd></div></dl></div>
+          <p><b>Ruolo:</b> ${p.role ? esc(p.role.name) + '. ' + esc((ROLES[p.role.role] || { text: '' }).text) : 'nessuno'}</p>
+          <p><b>Asset equipaggiati</b></p><ul class="gearlist">${gs.length ? gs.map(([s, g]) => `<li>${faceHTML(g)}<span>${esc(g.name)}<small>${SLOTS[s]}, +${p.gearBonus[s]}</small></span></li>`).join('') : '<li class="none">Nessuno.</li>'}</ul>`;
       },
       buttons: () => [{ label: 'Chiudi', cls: 'primary' }]
     });
@@ -661,28 +720,24 @@
     if (c) return `<button type="button" class="btn" data-m="back">← Tutte le carte</button>
       <h4>${esc(c.name)}</h4><p class="kind">mazzo ${c.deck === 'T' ? 'Ticket' : 'Asset'} · ${c.n} ${pl(c.n, 'copia', 'copie')}</p>${cardDetail(c)}`;
     return `<div class="wiki-f">${[...new Set(Object.values(WIKI))].map(g => `<button type="button" class="btn${g === st.f ? ' primary' : ''}" data-m="f:${g}" aria-pressed="${g === st.f}">${g}</button>`).join('')}</div>
-      <div class="wiki">${all.map((x, i) => WIKI[x.type] !== st.f ? '' : `<button type="button" class="wiki-i" data-m="c:${i}"><img src="/cards/${artSlug(x)}.jpg" alt="" loading="lazy"><span>${esc(x.name)}</span><small>×${x.n}</small></button>`).join('')}</div>`;
+      <div class="wiki">${all.map((x, i) => WIKI[x.type] !== st.f ? '' : `<button type="button" class="wiki-i" data-m="c:${i}"><span class="face" data-art="${artSlug(x)}"><img src="/cards/${artSlug(x)}.jpg" alt="" loading="lazy"></span><span>${esc(x.name)}</span><small>×${x.n}</small></button>`).join('')}</div>`;
   }
   function openRules() {
     const st = S.rulesUi || (S.rulesUi = { tab: 'rules', f: 'Minacce', sel: -1 });
     if (st.tab === 'wiki') loadCatalog();
     openModal({
-      dismiss: true, title: 'Regole di ESCALATION',
+      dismiss: true, cls: 'wide', title: 'Regole di ESCALATION',
       onBody: el => {
         const [k, v] = el.dataset.m.split(':');
         if (k === 'tab') { st.tab = v; if (v === 'wiki') loadCatalog(); }
         if (k === 'f') st.f = v;
         st.sel = k === 'c' ? +v : -1;
       },
-      buttons: () => {
-        const layout = store.get('esc-hand-layout') || 'row';
-        return [
-          { label: 'Come si gioca in 3 schede', on: openTut },
-          { label: `Passo automatico senza carte da combattimento: ${S.autopass ? 'attivo' : 'disattivo'}`, on: () => { S.autopass = !S.autopass; store.set('esc-autopass', S.autopass); scheduleAutopass(); toast(`Passo automatico ${S.autopass ? 'attivato' : 'disattivato'}.`); openRules(); } },
-          { label: `Layout mano: ${layout === 'fan' ? 'ventaglio (hook)' : 'fila'} — tocca per cambiare`, on: () => { const next = layout === 'fan' ? 'row' : 'fan'; store.set('esc-hand-layout', next); toast(`Mano: ${next === 'fan' ? 'ventaglio (struttura pronta, tema dopo)' : 'fila'}.`); render(); openRules(); } },
-          { label: 'Chiudi', cls: 'primary' }
-        ];
-      },
+      buttons: () => [
+        { label: 'Come si gioca in 3 schede', on: openTut },
+        { label: `Passo automatico senza carte da combattimento: ${S.autopass ? 'attivo' : 'disattivo'}`, on: () => { S.autopass = !S.autopass; store.set('esc-autopass', S.autopass); scheduleAutopass(); toast(`Passo automatico ${S.autopass ? 'attivato' : 'disattivato'}.`); openRules(); } },
+        { label: 'Chiudi', cls: 'primary' }
+      ],
       html: () => `<div class="tabs" role="tablist">${[['rules', 'Come si gioca'], ['wiki', 'Wiki carte']].map(([k, l]) => `<button type="button" role="tab" class="btn${st.tab === k ? ' primary' : ''}" data-m="tab:${k}" aria-selected="${st.tab === k}">${l}</button>`).join('')}</div>
         <div class="rules">${st.tab === 'wiki' ? wikiHTML(st) : `
         <h4>Obiettivo</h4><p>Arrivare per primi al livello 10, <b>root</b>. L'ultimo livello si ottiene solo neutralizzando una Minaccia: carte livello e credito si fermano al 9.</p>
@@ -758,19 +813,21 @@
   const peek = document.createElement('div');
   peek.id = 'peek'; peek.className = 'hidden'; peek.setAttribute('aria-hidden', 'true');
   document.body.appendChild(peek);
-  const hidePeek = () => { peek.classList.add('hidden'); peek._uid = null; };
+  const hidePeek = () => { peek.classList.add('hidden'); peek._uid = null; peek._el = null; };
   if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
     document.addEventListener('mouseover', e => {
-      const el = !S.modal && S.view && e.target.closest('.card[data-uid], .slot.full');
-      const c = el && (el.dataset.uid ? (V().hand.find(x => x.uid === +el.dataset.uid) || findPublic(+el.dataset.uid)) : ME().gear[el.dataset.slot]);
+      const el = !S.modal && S.view && S.room && S.room.started && e.target.closest('.card[data-uid], .slot.full');
+      const c = el && (el.dataset.uid ? (V().hand.find(x => x.uid === +el.dataset.uid) || findPublic(+el.dataset.uid)) : el.dataset.role ? ME().role : ME().gear[el.dataset.slot]);
       if (!c) return hidePeek();
       if (peek._uid === c.uid) return;
-      peek._uid = c.uid;
-      peek.innerHTML = `<img src="/cards/${artSlug(c)}.jpg" alt=""><div><b>${esc(c.name)}</b>${fxHTML(c)}</div>`;
+      peek._uid = c.uid; peek._el = el;
+      peek.innerHTML = `${faceHTML(c)}<div><b>${esc(c.name)}</b>${fxHTML(c)}</div>`;
       peek.classList.remove('hidden');
       const r = el.getBoundingClientRect(), w = peek.offsetWidth, h = peek.offsetHeight;
       const x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8);
-      const y = r.top - h - 14 > 8 ? r.top - h - 14 : Math.min(r.bottom + 14, innerHeight - h - 8);
+      // sopra la carta se c'è posto (lasciando spazio al sollevamento della mano), altrimenti sotto
+      const lift = el.closest('.hand') ? 64 : 14;
+      const y = r.top - h - lift > 8 ? r.top - h - lift : Math.min(r.bottom + 14, innerHeight - h - 8);
       peek.style.left = x + 'px'; peek.style.top = y + 'px';
     });
   }
@@ -795,6 +852,7 @@
     }
     if (e.key === 'Enter' || e.key === ' ') {
       if (e.target && e.target.id === 'log') { e.preventDefault(); S.logOpen = !S.logOpen; render(); return; }
+      if (e.target && e.target.classList && e.target.classList.contains('opp') && !S.modal) { e.preventDefault(); openOppModal(e.target.dataset.pid); return; }
     }
     if (e.key === 'Enter' && e.target.dataset && e.target.dataset.botid) { e.target.blur(); return; }
     if (e.key !== 'Enter' || !e.target.dataset || !e.target.dataset.f) return;
@@ -883,10 +941,9 @@
   // countdown
   setInterval(() => {
     document.querySelectorAll('[data-cd]').forEach(el => {
-      if (el.classList.contains('clock') && S.tut) { el.textContent = 'pausa'; el.classList.remove('urgent'); return; }
       const left = (el.dataset.cd === 'offer' ? S.offerAt : S.deadlineAt) - Date.now();
       el.textContent = mmss(left);
-      if (el.classList.contains('clock') || el.classList.contains('hud-cd')) el.classList.toggle('urgent', left < 15000);
+      if (el.classList.contains('hud-cd')) el.classList.toggle('urgent', left < 15000);
     });
   }, 1000);
 

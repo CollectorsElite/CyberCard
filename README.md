@@ -75,7 +75,7 @@ Il pubblico è fatto di gente di IT: il client va considerato ostile.
 - **Casualità lato server** con `crypto.randomInt` (mescolata e dadi).
 - Token di sessione casuali (144 bit), confronto a tempo costante.
 - WebSocket: payload massimo 4 KB, rate limit di 10 messaggi al secondo per connessione, limite ai tentativi di ingresso, verifica dell'`Origin` (niente connessioni da altri siti), heartbeat per chiudere le connessioni morte.
-- HTTP: solo i tre file del client in whitelist (niente path traversal), CSP restrittiva senza script inline, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`.
+- HTTP: solo i file del client in whitelist (niente path traversal), CSP restrittiva senza script né stili inline, font servito in locale, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`.
 - I nomi dei giocatori vengono ripuliti lato server e tutto il testo è sottoposto a escape lato client.
 
 ## Regole in breve
@@ -97,6 +97,11 @@ server/
   bots.js    decisioni dei bot, una azione alla volta
   index.js   HTTP statico + WebSocket, stanze, riconnessione, scheduler di bot e timeout
 public/      client (HTML, CSS, JS senza dipendenze)
+  cards.css  ritaglio di ogni illustrazione sulla propria cornice (generato, vedi sotto)
+  fonts/     Archivo variabile (licenza OFL inclusa)
+art/
+  cards/, board/     illustrazioni delle carte, dorsi e texture del tavolo
+  build-frames.py    rigenera public/cards.css quando cambiano le illustrazioni
 test/
   sim.js     partite simulate + fuzzing con azioni ostili, controllo di conservazione delle carte
   ws.js      integrazione: server reale, 3 client WebSocket + 2 bot fino a fine partita
@@ -105,6 +110,17 @@ test/
 ```bash
 npm test
 ```
+
+## Interfaccia
+
+Il tavolo è una scrivania vista dall'alto: gli avversari sono badge aziendali in alto, il tappetino al centro ospita mazzi, ticket scoperto e combattimento, in basso ci sono la tua postazione, la mano a ventaglio e le azioni con il timer. Su schermo largo sta tutto in una sola vista; su telefono mano e azioni restano fisse in basso e il resto scorre sopra.
+
+- Il giallo segna sempre «tocca a te»: turno attivo, carte giocabili in questo momento, mazzo da cui pescare.
+- Il mazzo Ticket è cliccabile nel tuo turno (apre un ticket o analizza i log), oltre al pulsante.
+- Il tiro di fuga compare come dado al centro del tavolo.
+- Ogni zona della partita si ridisegna solo quando cambia: una mossa altrui non tocca la tua mano.
+
+Le illustrazioni non vengono modificate: `art/build-frames.py` (Python con Pillow e numpy) misura la cornice nera di ogni immagine e scrive in `public/cards.css` le percentuali con cui il CSS la fa combaciare con il bordo della carta. Va rilanciato quando si aggiungono o cambiano illustrazioni; `npm test` segnala le carte senza ritaglio.
 
 ## Limiti noti
 

@@ -35,10 +35,12 @@ const FILES = {
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/client.js': ['client.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
+  '/cards.css': ['cards.css', 'text/css; charset=utf-8'],
+  '/fonts/archivo.woff2': ['fonts/archivo.woff2', 'font/woff2', 'public, max-age=604800'],
   '/admin.html': ['admin.html', 'text/html; charset=utf-8'],
   '/admin.js': ['admin.js', 'text/javascript; charset=utf-8']
 };
-const CACHE = Object.fromEntries(Object.entries(FILES).map(([u, [f, type]]) => [u, { body: fs.readFileSync(path.join(PUB, f)), type }]));
+const CACHE = Object.fromEntries(Object.entries(FILES).map(([u, [f, type, cache]]) => [u, { body: fs.readFileSync(path.join(PUB, f)), type, cache }]));
 // Wiki delle Regole: una voce per carta del mazzo, con il numero di copie.
 const catalog = new Map();
 for (const c of Object.values(buildDecks(() => 0, x => x)).flat()) {
@@ -99,8 +101,7 @@ function handleAdmin(req, res) {
       })),
       config: {
         maxRooms: MAX_ROOMS, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS,
-        botDelay: BOT_DELAY, timeoutScale: TIMEOUT_SCALE, graceMs: GRACE, roomMaxMs: ROOM_MAX_MS,
-        handLayoutDefault: 'row' // impostazione grafica: fan arriva dopo
+        botDelay: BOT_DELAY, timeoutScale: TIMEOUT_SCALE, graceMs: GRACE, roomMaxMs: ROOM_MAX_MS
       }
     });
   }
@@ -143,7 +144,7 @@ const server = http.createServer((req, res) => {
   }
   const f = CACHE[url];
   if (!f) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Non trovato'); }
-  res.writeHead(200, { 'Content-Type': f.type, 'Cache-Control': 'no-cache', ...securityHeaders() });
+  res.writeHead(200, { 'Content-Type': f.type, 'Cache-Control': f.cache || 'no-cache', ...securityHeaders() });
   res.end(req.method === 'HEAD' ? undefined : f.body);
 });
 

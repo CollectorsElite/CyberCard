@@ -41,7 +41,18 @@ assert(src.includes("store.get('esc-tut-off')") && src.includes("store.set('esc-
 assert(src.includes('data-botid'), 'nome bot in linea assente');
 assert(src.includes('class="hud'), 'HUD combattimento assente');
 const css = fs.readFileSync(path.join(root, 'public', 'style.css'), 'utf8');
-assert(css.includes('/board/desk.jpg') && css.includes('/board/room.jpg'), 'texture plancia mancanti nello CSS');
+assert(css.includes('/board/desk.jpg') && css.includes('/board/felt.jpg'), 'texture plancia mancanti nello CSS');
+
+// Ritaglio delle illustrazioni: ogni carta (e i due dorsi) ha la sua regola in cards.css, generata da art/build-frames.py.
+const frames = fs.readFileSync(path.join(root, 'public', 'cards.css'), 'utf8');
+const noFrame = [...new Set([...T, ...A].map(artSlug)), 'back-ticket', 'back-asset'].filter(s => !frames.includes(`[data-art="${s}"]{`));
+assert.deepStrictEqual(noFrame, [], 'ritagli mancanti in public/cards.css (rilancia art/build-frames.py): ' + noFrame.join(', '));
+const html = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
+assert(html.includes('href="/cards.css"'), 'index.html non carica /cards.css');
+// Il font è servito da noi (la CSP non ammette origini esterne) e deve esistere davvero.
+assert(css.includes("url('/fonts/archivo.woff2')") && fs.existsSync(path.join(root, 'public', 'fonts', 'archivo.woff2')), 'font Archivo mancante');
+const srv = fs.readFileSync(path.join(root, 'server', 'index.js'), 'utf8');
+for (const u of ["'/cards.css'", "'/fonts/archivo.woff2'"]) assert(srv.includes(u), `il server non serve ${u}`);
 for (const n of [1, 2, 3]) assert(TUT.some(row => String(row[1]) === '/board/tut-' + n + '.jpg'), 'tutorial senza /board/tut-' + n + '.jpg');
 
 console.log(`OK art (${T.length + A.length} carte)`);
