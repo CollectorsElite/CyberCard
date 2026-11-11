@@ -17,15 +17,30 @@ function severe(g, c) {
   return c.threats.some(t => t.card.bad.some(e => (e.k === 'lvl' && (e.n >= 2 || f.level >= 7)) || ['gearAll', 'wipe', 'best'].includes(e.k)));
 }
 
-function wouldHelp(g, b, c, share) {
+// Quanti tesori vuole il bot per aiutare; null se non aiuterebbe a nessun prezzo.
+function helpDemand(g, b, c) {
   const f = g.fighter(c), tr = g.cTreasures(c);
-  if (f.level + g.cLevels(c) >= 10) return false;
-  if (f.level >= b.level + 3) return false;
-  if (tr === 0) return false;
+  if (f.level + g.cLevels(c) >= 10) return null;
+  if (f.level >= b.level + 3) return null;
+  if (tr === 0) return null;
   const fp = g.cFighterPower(c) + g.basePower(b), tp = g.cThreatPower(c);
-  if (!(fp > tp || (fp === tp && g.isRole(f, 'red')))) return false;
-  const demand = Math.min(tr, Math.ceil(tr / 2) + (f.level > b.level ? 1 : 0));
-  return share >= demand;
+  if (!(fp > tp || (fp === tp && g.isRole(f, 'red')))) return null;
+  return Math.min(tr, Math.ceil(tr / 2) + (f.level > b.level ? 1 : 0));
+}
+
+// Risposta del bot a una proposta: accetta se gli conviene, altrimenti rilancia con la sua cifra finché si può.
+function answerOffer(g, b, c) {
+  const o = c.offer, tr = g.cTreasures(c), canCounter = o.round < g.helpCounters;
+  if (c.fighter === b.id) {
+    // il bot combatte e l'altro ha rilanciato: cede di più se la sconfitta costa cara
+    const limit = severe(g, c) ? tr : Math.min(tr, Math.ceil(tr / 2) + 1);
+    if (o.share <= limit) return { type: 'answerHelp', accept: true };
+    return canCounter ? { type: 'counterHelp', share: limit } : { type: 'answerHelp', accept: false };
+  }
+  const demand = helpDemand(g, b, c);
+  if (demand === null) return { type: 'answerHelp', accept: false };
+  if (o.share >= demand) return { type: 'answerHelp', accept: true };
+  return canCounter ? { type: 'counterHelp', share: demand } : { type: 'answerHelp', accept: false };
 }
 
 // Prossima azione di gestione nel proprio turno (ruolo, equipaggiamento, livelli, vendite).
@@ -100,7 +115,8 @@ function decide(g, pid) {
   if (g.over) return null;
   const b = g.p(pid), c = g.combat;
   if (c) {
-    if (c.offer && c.offer.to === pid) return { type: 'answerHelp', accept: wouldHelp(g, b, c, c.offer.share) };
+    if (c.offer && c.offer.to === pid) return answerOffer(g, b, c);
+    if (c.offer && c.offer.from === pid) return null; // aspetta la risposta
     if (c.step === 'prep' && c.fighter === pid) return selfBoost(g, b, c) || { type: 'fight' };
     if (c.step === 'window' && !c.passes.has(pid)) {
       if (c.fighter === pid) {

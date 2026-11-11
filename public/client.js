@@ -361,9 +361,9 @@
     const turn = v.cur === p.id && !v.over;
     let st = '';
     if (c) {
-      if (p.id === c.fighter) st = `<span class="st fight">combatte${c.step === 'window' && passed(p.id) ? ' ✓' : ''}</span>`;
+      if (c.offer && c.offer.to === p.id) st = `<span class="st wait">${c.offer.round ? 'valuta proposta' : 'valuta aiuto'}</span>`;
+      else if (p.id === c.fighter) st = `<span class="st fight">combatte${c.step === 'window' && passed(p.id) ? ' ✓' : ''}</span>`;
       else if (p.id === c.helper) st = `<span class="st help">aiuta${c.step === 'window' && passed(p.id) ? ' ✓' : ''}</span>`;
-      else if (c.offer && c.offer.to === p.id) st = '<span class="st wait">valuta aiuto</span>';
       else if (c.step === 'window') st = passed(p.id) ? '<span class="st ok">passo ✓</span>' : '<span class="st wait">decide</span>';
     } else if (v.over && v.winner === p.id) st = '<span class="st ok">root</span>';
     else if (turn) st = '<span class="st wait">di turno</span>';
@@ -407,7 +407,11 @@
         k = 'Finestra di interferenza';
         m = passed(S.you) ? `Hai passato. ${left}` : `Gioca una carta o passa. ${left}`;
       } else if (c.step === 'flee') { k = 'Fuga'; m = mineFight ? 'Sei in svantaggio: tira il dado.' : `${esc(f.name)} deve tentare la fuga.`; }
-      if (c.offer) { k = 'Richiesta di aiuto'; m = `${esc(name(c.offer.from))} chiede aiuto a ${esc(name(c.offer.to))} per ${c.offer.share} ${pl(c.offer.share, 'tesoro', 'tesori')}. Risposta entro ${cd('offer')}`; }
+      if (c.offer) {
+        const o = c.offer, n = `${o.share} ${pl(o.share, 'tesoro', 'tesori')}`;
+        k = o.round ? 'Trattativa' : 'Richiesta di aiuto';
+        m = (o.round ? `${esc(name(o.from))} rilancia con ${esc(name(o.to))}: ${n} all'aiutante.` : `${esc(name(o.from))} chiede aiuto a ${esc(name(o.to))} per ${n}.`) + ` Risposta entro ${cd('offer')}`;
+      }
       const diff = Math.abs(c.fighterPower - c.threatPower);
       return `${hud(k, m, (v.needs.includes(S.you) ? ' need' : '') + (c.step === 'window' ? ' win' : ''))}
         <div class="duel${multi ? ' multi' : ''}">
@@ -492,8 +496,9 @@
     const out = (hint, btns = '') => `<div class="dock-top">${v.over ? '' : S.tut ? '<span class="hud-cd hold">pausa</span>' : `<span class="hud-cd" data-cd="main">${mmss(S.deadlineAt - Date.now())}</span>`}<p class="hint">${hint}</p></div>${btns ? `<div class="btns">${btns}</div>` : ''}`;
     if (v.over) return out(isHost ? 'Stessa stanza, stessi colleghi.' : 'In attesa che l\'host proponga la rivincita.', (isHost ? B('rematch', 'Rivincita', 'primary') : '') + B('leave', 'Esci', 'ghost'));
     if (c) {
-      if (c.offer && c.offer.to === me) return out(`${esc(name(c.offer.from))} ti chiede aiuto. Rispondi entro ${cd('offer')}`);
+      if (c.offer && c.offer.to === me) return out(`${esc(name(c.offer.from))} ${c.offer.round ? 'ha rilanciato' : 'ti chiede aiuto'}. Rispondi entro ${cd('offer')}`, B('offer', 'Rispondi', 'primary'));
       const fighter = c.fighter === me, canAsk = fighter && !c.helper && !c.offer;
+      if (c.offer && c.offer.from === me && !fighter) return out(`Hai proposto ${c.offer.share} ${pl(c.offer.share, 'tesoro', 'tesori')} a ${esc(name(c.offer.to))}. Risposta entro ${cd('offer')}`, B('cancelHelp', 'Ritira la proposta', 'ghost'));
       if (c.step === 'prep') {
         if (fighter) return out('Prima di combattere puoi usare carte o chiedere aiuto. Poi si apre la finestra per gli altri.', (canAsk ? B('help', 'Chiedi aiuto') : '') + B('fight', 'Combatti', 'primary'));
         return out(`${esc(name(c.fighter))} si prepara. Potrai interferire quando si apre la finestra.`);
@@ -561,7 +566,7 @@
     scheduleAutopass();
     const c = v.combat;
     if (c && c.offer && c.offer.to === S.you) {
-      const key = `${v.gid}|${c.offer.from}|${c.offer.share}|${c.asked.length}|${c.threats[0].card.uid}`;
+      const key = `${v.gid}|${c.offer.from}|${c.offer.share}|${c.offer.round}|${c.asked.length}|${c.threats[0].card.uid}`;
       if (S.offerShown !== key) { S.offerShown = key; openOfferModal(); }
     }
   }
@@ -644,7 +649,7 @@
       valid: () => { const c = V() && V().combat; return !!(c && c.fighter === S.you && !c.helper && !c.offer); },
       html: () => {
         const c = V().combat;
-        return `<p>Chi accetta somma la sua forza alla tua e pesca per primo i tesori che gli offri. Non guadagna livelli. Una richiesta alla volta.</p>
+        return `<p>Chi accetta somma la sua forza alla tua e pesca per primo i tesori che gli offri. Non guadagna livelli. Può anche rilanciare con un'altra cifra. Una richiesta alla volta.</p>
           <p>Tesori in palio: <b>${c.treasures}</b>. Ne offri:</p>
           <div class="stepper"><button type="button" data-m="minus" aria-label="Meno">−</button><b>${st.share}</b><button type="button" data-m="plus" aria-label="Più">+</button></div>`;
       },
@@ -659,20 +664,43 @@
     });
   }
 
+  // Risposta a una proposta di aiuto. Dopo una controproposta i ruoli si invertono:
+  // la stessa finestra serve sia a chi viene chiamato in aiuto sia a chi combatte.
   function openOfferModal() {
+    const st = { share: null };
+    const off = () => { const c = V() && V().combat; return c && c.offer && c.offer.to === S.you ? c : null; };
+    // la controproposta deve essere diversa dalla cifra sul tavolo: il selettore la salta
+    const step = (c, d) => { let s = st.share + d; if (s === c.offer.share) s += d; return s < 0 || s > c.treasures ? st.share : s; };
+    // cifra di partenza: chi aiuta chiede un tesoro in più, chi combatte ne lascia uno in meno
+    const init = c => { if (st.share !== null) return; const up = c.fighter === S.you ? -1 : 1; st.share = c.offer.share; st.share = step(c, up); if (st.share === c.offer.share) st.share = step(c, -up); };
     openModal({
-      title: 'Richiesta di aiuto',
-      valid: () => { const c = V() && V().combat; return !!(c && c.offer && c.offer.to === S.you); },
+      title: () => { const c = off(); return c && c.offer.round ? 'Controproposta' : 'Richiesta di aiuto'; },
+      valid: () => !!off(),
       html: () => {
-        const c = V().combat, f = P(c.fighter), with_ = c.fighterPower + ME().power;
+        const c = off(), o = c.offer, f = P(c.fighter), mine = c.fighter === S.you, h = mine ? P(o.from) : ME();
+        const n = `<b>${o.share}</b> ${pl(o.share, 'tesoro', 'tesori')} su ${c.treasures}`;
         const names = c.threats.map(t => t.card.name).join(' + ');
-        return `<p><b>${esc(f.name)}</b> ti chiede aiuto contro <b>${esc(names)}</b>.</p>
-          <p>Da solo: ${c.fighterPower} contro ${c.threatPower}. Con te: ${with_}.</p>
-          <p>Ti offre <b>${c.offer.share}</b> ${pl(c.offer.share, 'tesoro', 'tesori')} su ${c.treasures}. Tu non guadagni livelli.</p>
-          ${f.level + c.levels >= 10 ? '<p class="warn">Se vince, vince la partita.</p>' : ''}
+        init(c);
+        const can = o.canCounter && st.share !== o.share;
+        const lead = mine ? `<p><b>${esc(h.name)}</b> ti aiuta contro <b>${esc(names)}</b>, ma vuole ${n}.</p>`
+          : o.round ? `<p><b>${esc(f.name)}</b> rilancia: ti offre ${n} per l'aiuto contro <b>${esc(names)}</b>.</p>`
+            : `<p><b>${esc(f.name)}</b> ti chiede aiuto contro <b>${esc(names)}</b> e ti offre ${n}.</p>`;
+        return `${lead}
+          <p>${mine ? 'Da solo' : 'Da solo ha'}: ${c.fighterPower} contro ${c.threatPower}. Con ${mine ? esc(h.name) : 'te'}: ${c.fighterPower + h.power}.${mine ? '' : ' Tu non guadagni livelli.'}</p>
+          ${!mine && f.level + c.levels >= 10 ? '<p class="warn">Se vince, vince la partita.</p>' : ''}
+          ${can ? `<p>Oppure rilancia. Tesori ${mine ? 'che gli lasci' : 'che chiedi'}:</p>
+            <div class="stepper"><button type="button" data-m="minus" aria-label="Meno">−</button><b>${st.share}</b><button type="button" data-m="plus" aria-label="Più">+</button></div>`
+            : o.canCounter ? '' : '<p>Trattativa al limite: puoi solo accettare o rifiutare.</p>'}
           <p class="hint">Rispondi entro <span class="hud-cd" data-cd="offer">${mmss(S.offerAt - Date.now())}</span></p>`;
       },
-      buttons: () => [{ label: 'Accetta', cls: 'primary', on: () => act({ type: 'answerHelp', accept: true }) }, { label: 'Rifiuta', cls: 'ghost', on: () => act({ type: 'answerHelp', accept: false }) }]
+      onBody: el => { const c = off(); if (!c) return; if (el.dataset.m === 'minus') st.share = step(c, -1); if (el.dataset.m === 'plus') st.share = step(c, 1); },
+      buttons: () => {
+        const c = off(), B = [{ label: 'Accetta', cls: 'primary', on: () => act({ type: 'answerHelp', accept: true }) }];
+        if (c) init(c);
+        if (c && c.offer.canCounter && st.share !== c.offer.share) B.push({ label: `Rilancia a ${st.share} ${pl(st.share, 'tesoro', 'tesori')}`, on: () => act({ type: 'counterHelp', share: st.share }) });
+        B.push({ label: 'Rifiuta', cls: 'ghost', on: () => act({ type: 'answerHelp', accept: false }) });
+        return B;
+      }
     });
   }
 
@@ -750,7 +778,7 @@
         <li>Se non hai combattuto: <b>cerca guai</b> (affronti una Minaccia dalla mano) o <b>analizza i log</b> (peschi una carta coperta).</li>
         <li><b>Fine turno</b>: massimo 5 carte in mano, scegli tu cosa scartare.</li></ul>
         <h4>Combattimento</h4><p>Forza = livello + asset + carte a uso singolo. Chi combatte si prepara, poi si apre la <b>finestra di interferenza</b>: tutti, compreso chi combatte, devono dichiarare «passo». Ogni carta giocata riapre il giro dei passo. Quando tutti hanno passato: se sei in vantaggio vinci livelli e tesori, altrimenti tiri il dado per fuggire (5+, Sysadmin 4+).</p>
-        <h4>Aiuto</h4><p>Chi combatte può chiedere aiuto a un avversario offrendo una parte dei tesori. L'aiutante somma la sua forza, pesca per primo la sua parte e non guadagna livelli.</p>
+        <h4>Aiuto</h4><p>Chi combatte può chiedere aiuto a un avversario offrendo una parte dei tesori. Chi riceve la proposta può accettare, rifiutare o rilanciare con un'altra cifra; a quel punto risponde l'altro, fino a tre controproposte. L'aiutante somma la sua forza, pesca per primo la sua parte e non guadagna livelli.</p>
         <h4>Sabotaggi ed Esposizione</h4><p>Potenziare la Minaccia di un altro, aggiungerne una con Movimento laterale o giocare una Sfiga su qualcuno (in qualsiasi momento) è un <b>sabotaggio</b>: +1 Esposizione. A 4 scatta l'<b>audit del SOC</b>: −1 livello e si riparte da zero. L'Ingegnere sociale non lascia tracce.</p>
         <h4>Asset e credito</h4><p>Uno slot per tipo: Hardware, Software, Credenziali, Gadget. Puoi equipaggiarti, cambiare ruolo e vendere in qualsiasi momento, ma mai durante un combattimento. Vendendo asset accumuli credito: ogni 1000 è +1 livello.</p>
         <h4>Ruoli</h4><ul>${Object.values(ROLES).map(r => `<li><b>${r.name}</b>: ${r.text}</li>`).join('')}</ul>
@@ -791,7 +819,7 @@
       <ul class="touts">
         <li><span class="tv">${tcard('back-asset', 'back')}</span><div><span class="tchip win">Vinci</span><p>+1 o +2 livelli e tesori dal mazzo Asset.</p></div></li>
         <li><span class="tv"><span class="die" data-v="5" aria-hidden="true">${'<i></i>'.repeat(9)}</span></span><div><span class="tchip lose">Perdi</span><p>Tiri il dado per fuggire: serve 5 o più, al Sysadmin basta 4. Se fallisci subisci la penalità della Minaccia. Con un Rollback scappi senza tirare.</p></div></li>
-        <li><span class="tv"><span class="ava" data-seat="0" aria-hidden="true">TU</span><span class="ava" data-seat="1" aria-hidden="true">+</span></span><div><span class="tchip help">Aiuto</span><p>Offri una parte dei tesori. Chi ti aiuta somma la sua forza, ma non sale di livello.</p></div></li>
+        <li><span class="tv"><span class="ava" data-seat="0" aria-hidden="true">TU</span><span class="ava" data-seat="1" aria-hidden="true">+</span></span><div><span class="tchip help">Aiuto</span><p>Offri una parte dei tesori: l'altro può accettare, rifiutare o rilanciare. Chi ti aiuta somma la sua forza, ma non sale di livello.</p></div></li>
         <li><span class="tv"><span class="esp" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></span><div><span class="tchip sab">Sabotaggio</span><p>Potenziare la Minaccia di un altro o giocargli una Sfiga costa 1 punto di Esposizione. A 4 scatta l'audit del SOC: perdi 1 livello.</p></div></li>
       </ul>`;
     const kind = (card, name, text) => `<li>${card}<div><b>${name}</b><p>${text}</p></div></li>`;
@@ -968,6 +996,7 @@
       case 'fight': return act({ type: 'fight' });
       case 'pass': return act({ type: 'pass' });
       case 'help': return openHelpModal();
+      case 'offer': return openOfferModal();
       case 'cancelHelp': return act({ type: 'cancelHelp' });
       case 'flee': return act({ type: 'flee' });
     }

@@ -64,7 +64,7 @@ Dietro un reverse proxy, inoltra anche l'upgrade WebSocket sul path `/ws`.
 | `MAX_CREATES_PER_IP` | 20 | Cap create per IP / ora |
 | `ADMIN_TOKEN` | _(vuoto)_ | Abilita `/admin.html` e `/admin/api/*`. Vuoto = admin spento |
 
-Tempi massimi di default: 90 s per le azioni del proprio turno, 60 s per prepararsi al combattimento, 45 s per la finestra di interferenza (si azzera a ogni carta giocata), 25 s per rispondere a una richiesta di aiuto, 30 s per la fuga.
+Tempi massimi di default: 90 s per le azioni del proprio turno, 60 s per prepararsi al combattimento, 45 s per la finestra di interferenza (si azzera a ogni carta giocata), 25 s per rispondere a una richiesta di aiuto o a una controproposta, 30 s per la fuga.
 
 ## Anti-cheat e sicurezza
 
@@ -83,7 +83,7 @@ Il pubblico è fatto di gente di IT: il client va considerato ostile.
 - **Obiettivo**: primo a livello 10 (*root*). L'ultimo livello si prende solo vincendo un combattimento.
 - **Turno**: apri un ticket (carta scoperta). Minaccia → combatti; Sfiga → la subisci; altro → in mano. Se non hai combattuto puoi *cercare guai* (affronti una Minaccia dalla mano) o *analizzare i log* (peschi coperto). A fine turno massimo 5 carte in mano: scegli tu cosa scartare.
 - **Combattimento**: forza = livello + asset + carte a uso singolo. Dopo la preparazione si apre la **finestra di interferenza**: tutti, compreso chi combatte, devono dichiarare «passo». Ogni carta giocata riapre il giro. Poi: se sei in vantaggio vinci livelli e tesori, altrimenti tiri il dado per fuggire (5+, Sysadmin 4+).
-- **Aiuto**: chi combatte offre a un avversario una quota dei tesori; se accetta somma la sua forza e pesca per primo la sua quota. Non guadagna livelli.
+- **Aiuto**: chi combatte offre a un avversario una quota dei tesori. L'altro può accettare, rifiutare o rilanciare con un'altra cifra; a quel punto risponde chi combatte, e così via fino a tre controproposte. Chi aiuta somma la sua forza e pesca per primo la sua quota. Non guadagna livelli.
 - **Sabotaggi ed Esposizione**: potenziare la minaccia altrui, aggiungerne una con *Movimento laterale* o giocare una Sfiga su qualcuno (in qualsiasi momento) costa 1 punto di Esposizione. A 4 scatta l'**audit del SOC**: −1 livello e si riparte da zero. L'*Ingegnere sociale* non lascia tracce.
 - **Asset**: uno slot per tipo (Hardware, Software, Credenziali, Gadget). Ci si equipaggia, si cambia ruolo e si vende in qualsiasi momento, mai durante un combattimento. 1000 di credito = +1 livello (fino al 9).
 - **Passo automatico** (attivo di default, si cambia da *Regole*): se non hai carte da combattimento il client passa da solo dopo un ritardo casuale, così il tempo di risposta non rivela la tua mano.
@@ -124,6 +124,6 @@ Le illustrazioni non vengono modificate: `art/build-frames.py` (Python con Pillo
 
 ## Limiti noti
 
-- I bot sono semplici: sabotano soprattutto chi è in testa e accettano l'aiuto solo se il compenso è sufficiente.
+- I bot sono semplici: sabotano soprattutto chi è in testa e accettano l'aiuto solo se il compenso è sufficiente; se è troppo basso rilanciano con la cifra che vogliono.
 - Niente chat in partita: le trattative si fanno a voce o sulla chat che usate già.
 - Il bilanciamento è tarato su simulazioni tra bot (partite di circa 9-10 giri): con persone vere che si coalizzano le partite si allungano. I valori si cambiano in `server/cards.js`.

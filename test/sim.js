@@ -24,7 +24,7 @@ function check(g, total) {
 }
 
 const ACTS = ['openTicket', 'trouble', 'loot', 'endTurn', 'equip', 'unequip', 'takeRole', 'dropRole', 'levelUp', 'sell', 'discard', 'curse',
-  'fight', 'play', 'pass', 'askHelp', 'cancelHelp', 'answerHelp', 'flee', 'rollback', '__proto__', 'constructor', 'hack'];
+  'fight', 'play', 'pass', 'askHelp', 'cancelHelp', 'answerHelp', 'counterHelp', 'flee', 'rollback', '__proto__', 'constructor', 'hack'];
 function randomAction(g, p) {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const anyUid = () => (Math.random() < 0.8 && p.hand.length ? pick(p.hand).uid : pick([0, -1, 9999, 'x', null, 1.5]));

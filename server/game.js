@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { TITLES, SLOTS, ROLES, QUIPS, buildDecks } = require('./cards');
 
 const HAND_MAX = 5, ESP_MAX = 4, WIN_LEVEL = 10;
+const HELP_COUNTERS = 3; // controproposte ammesse in una trattativa di aiuto, poi si può solo accettare o rifiutare
 const DEFAULT_TIMEOUTS = { turn: 90000, prep: 60000, window: 45000, offer: 25000, flee: 30000 };
 
 class GameError extends Error {}
@@ -44,6 +45,7 @@ class Game {
   log(t, cls = '') { this.logs.push({ t, cls, i: ++this.seq }); if (this.logs.length > 400) this.logs.shift(); }
   fx(e) { this.fxs.push({ ...e, i: ++this.seq }); if (this.fxs.length > 300) this.fxs.shift(); }
   setDeadline(ms) { this.deadline = this.now() + ms; }
+  get helpCounters() { return HELP_COUNTERS; }
   draw(k) {
     const deck = this.decks[k], disc = this.disc[k];
     if (!deck.length && disc.length) { deck.push(...this.shuffle(disc.splice(0))); this.log(`Mazzo ${k === 'T' ? 'Ticket' : 'Asset'} rimescolato.`, 'sys'); }
@@ -295,11 +297,29 @@ class Game {
     if (to === p) fail('Non puoi aiutarti da solo.');
     const tr = this.cTreasures(c);
     if (!isInt(a.share) || a.share < 0 || a.share > tr) fail(`L'offerta deve essere tra 0 e ${tr} tesori.`);
-    c.offer = { from: p.id, to: to.id, share: a.share };
-    c.offerDeadline = this.now() + this.to.offer;
+    this.propose(c, { from: p.id, to: to.id, share: a.share, round: 0 });
     if (!c.asked.includes(to.id)) c.asked.push(to.id);
     this.log(`${p.name} chiede aiuto a ${to.name} offrendo ${a.share} ${pl(a.share, 'tesoro', 'tesori')}.`);
     this.fx({ kind: 'helpAsk', from: p.id, target: to.id, share: a.share });
+  }
+  // Una proposta in sospeso: `from` l'ha fatta, `to` deve rispondere. Il timer del combattimento
+  // non scade mentre si tratta, e a trattativa chiusa resta qualche secondo per reagire.
+  propose(c, offer) {
+    c.offer = offer;
+    c.offerDeadline = this.now() + this.to.offer;
+    this.deadline = Math.max(this.deadline, c.offerDeadline + Math.round(this.to.offer / 2));
+  }
+  // Chi riceve una proposta può rilanciare con un'altra cifra: i ruoli si invertono e risponde l'altro.
+  a_counterHelp(p, a) {
+    const c = this.combat;
+    if (!c || !c.offer || c.offer.to !== p.id) fail('Nessuna proposta a cui rispondere.');
+    const o = c.offer, tr = this.cTreasures(c);
+    if (o.round >= HELP_COUNTERS) fail('Trattativa al limite: accetta o rifiuta.');
+    if (!isInt(a.share) || a.share < 0 || a.share > tr) fail(`La controproposta deve essere tra 0 e ${tr} tesori.`);
+    if (a.share === o.share) fail('Proponi una cifra diversa, oppure accetta.');
+    this.propose(c, { from: p.id, to: o.from, share: a.share, round: o.round + 1 });
+    this.log(`${p.name} rilancia con ${this.p(o.from).name}: ${a.share} ${pl(a.share, 'tesoro', 'tesori')} all'aiutante.`);
+    this.fx({ kind: 'helpCounter', from: p.id, target: o.from, share: a.share });
   }
   a_cancelHelp(p) {
     const c = this.inCombat(['prep', 'window']);
@@ -311,13 +331,15 @@ class Game {
     const c = this.combat;
     if (!c || !c.offer || c.offer.to !== p.id) fail('Nessuna richiesta di aiuto per te.');
     const o = c.offer; c.offer = null;
+    // dopo una controproposta può essere chi combatte a rispondere: l'aiutante è sempre l'altro
+    const h = this.p(o.from === c.fighter ? o.to : o.from);
     if (a.accept) {
-      c.helper = p.id; c.share = o.share;
-      this.cEv(c, `${p.name} si unisce al combattimento (+${this.basePower(p)}) per ${o.share} ${pl(o.share, 'tesoro', 'tesori')}`, 'good');
+      c.helper = h.id; c.share = o.share;
+      this.cEv(c, `${h.name} si unisce al combattimento (+${this.basePower(h)}) per ${o.share} ${pl(o.share, 'tesoro', 'tesori')}`, 'good');
       this.say('helpYes');
       this.touch(c);
     } else {
-      this.log(`${p.name} rifiuta di aiutare ${this.fighter(c).name}.`);
+      this.log(p === h ? `${p.name} rifiuta di aiutare ${this.fighter(c).name}.` : `${p.name} rifiuta la controproposta di ${h.name}.`);
       this.fx({ kind: 'helpNo', by: p.id, to: o.from, quip: this.say('helpNo') });
       this.maybeClose();
     }
@@ -489,7 +511,7 @@ class Game {
     const c = this.combat;
     if (c && c.offer && c.offerDeadline <= now) {
       const to = this.p(c.offer.to);
-      this.log(`${to.name} non risponde alla richiesta di aiuto.`, 'sys');
+      this.log(`${to.name} non risponde alla ${c.offer.round ? 'controproposta' : 'richiesta di aiuto'}.`, 'sys');
       this.handle(to.id, { type: 'answerHelp', accept: false }); did = true;
     }
     while (!this.over && this.deadline <= now && guard++ < 20) {
@@ -517,7 +539,7 @@ class Game {
       hand: me ? me.hand : [],
       revealed: this.revealed,
       combat: c ? {
-        fighter: c.fighter, helper: c.helper, share: c.share, step: c.step, passes: [...c.passes], offer: c.offer,
+        fighter: c.fighter, helper: c.helper, share: c.share, step: c.step, passes: [...c.passes], offer: c.offer ? { ...c.offer, canCounter: c.offer.round < HELP_COUNTERS } : null,
         threats: c.threats.map(t => ({ card: t.card, mod: t.mod, eff: t.card.l + this.vsBonus(t.card, this.fighter(c)) })),
         fBonus: c.fBonus, mBonus: c.mBonus, ev: c.ev.slice(-12), asked: c.asked,
         fighterPower: this.cFighterPower(c), threatPower: this.cThreatPower(c), winning: this.cWinning(c),
