@@ -66,4 +66,9 @@ const lm = src.match(/const LADDER = (\[[^\]]*\]);/);
 assert(lm, 'LADDER non trovato in client.js');
 assert.deepStrictEqual(new Function('return ' + lm[1])(), require('../server/cards').TITLES.slice(1), 'le qualifiche del tutorial non coincidono con server/cards.js');
 
+// I testi dei ruoli sono ripetuti nel client: devono coincidere con quelli del server.
+const rm = src.match(/const ROLES = (\{[\s\S]*?\n  \});/);
+assert(rm, 'ROLES non trovato in client.js');
+assert.deepStrictEqual(new Function('return ' + rm[1])(), require('../server/cards').ROLES, 'ruoli del client diversi da server/cards.js');
+
 console.log(`OK art (${T.length + A.length} carte)`);

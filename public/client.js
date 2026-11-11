@@ -14,8 +14,8 @@
   const SLOTS = { hw: 'Hardware', sw: 'Software', cr: 'Credenziali', gd: 'Gadget' };
   const ROLES = {
     red: { name: 'Red Teamer', text: 'Vinci anche i pareggi in combattimento.' },
-    sys: { name: 'Sysadmin', text: 'La fuga riesce con 4 o più invece che con 5.' },
-    blue: { name: 'Blue Teamer', text: 'La prima Sfiga che ti colpisce in ogni giro viene bloccata.' },
+    sys: { name: 'Sysadmin', text: 'La fuga riesce con 3 o più invece che con 5.' },
+    blue: { name: 'Blue Teamer', text: 'La prima Sfiga che un avversario ti gioca in ogni giro viene bloccata.' },
     social: { name: 'Ingegnere sociale', text: 'I tuoi sabotaggi non aumentano l\'Esposizione.' }
   };
   const params = new URLSearchParams(location.search);
@@ -774,10 +774,11 @@
         <li><b>Mazzo Asset</b>: equipaggiamento per i 4 slot, carte a uso singolo e carte livello.</li></ul>
         <p>Cosa fa ogni carta, con forza, effetti e numero di copie: scheda <b>Wiki carte</b> qui sopra.</p>
         <h4>Il tuo turno</h4><ul>
+        <li><b>Dotazione</b>: finché sei a livello 1, a inizio turno peschi un Asset.</li>
         <li><b>Apri un ticket</b>: carta scoperta. Minaccia: combatti. Sfiga: la subisci. Altro: va in mano.</li>
         <li>Se non hai combattuto: <b>cerca guai</b> (affronti una Minaccia dalla mano) o <b>analizza i log</b> (peschi una carta coperta).</li>
         <li><b>Fine turno</b>: massimo 5 carte in mano, scegli tu cosa scartare.</li></ul>
-        <h4>Combattimento</h4><p>Forza = livello + asset + carte a uso singolo. Chi combatte si prepara, poi si apre la <b>finestra di interferenza</b>: tutti, compreso chi combatte, devono dichiarare «passo». Ogni carta giocata riapre il giro dei passo. Quando tutti hanno passato: se sei in vantaggio vinci livelli e tesori, altrimenti tiri il dado per fuggire (5+, Sysadmin 4+).</p>
+        <h4>Combattimento</h4><p>Forza = livello + asset + carte a uso singolo. Chi combatte si prepara, poi si apre la <b>finestra di interferenza</b>: tutti, compreso chi combatte, devono dichiarare «passo». Ogni carta giocata riapre il giro dei passo, comprese le Sfighe su chi combatte o su chi lo aiuta. Quando tutti hanno passato: se sei in vantaggio vinci livelli e tesori, altrimenti tiri il dado per fuggire (5+, Sysadmin 3+).</p>
         <h4>Aiuto</h4><p>Chi combatte può chiedere aiuto a un avversario offrendo una parte dei tesori. Chi riceve la proposta può accettare, rifiutare o rilanciare con un'altra cifra; a quel punto risponde l'altro, fino a tre controproposte. L'aiutante somma la sua forza, pesca per primo la sua parte e non guadagna livelli.</p>
         <h4>Sabotaggi ed Esposizione</h4><p>Potenziare la Minaccia di un altro, aggiungerne una con Movimento laterale o giocare una Sfiga su qualcuno (in qualsiasi momento) è un <b>sabotaggio</b>: +1 Esposizione. A 4 scatta l'<b>audit del SOC</b>: −1 livello e si riparte da zero. L'Ingegnere sociale non lascia tracce.</p>
         <h4>Asset e credito</h4><p>Uno slot per tipo: Hardware, Software, Credenziali, Gadget. Puoi equipaggiarti, cambiare ruolo e vendere in qualsiasi momento, ma mai durante un combattimento. Vendendo asset accumuli credito: ogni 1000 è +1 livello.</p>
@@ -818,7 +819,7 @@
       <p class="tnote">Prima dell'esito si apre la finestra di interferenza: ognuno gioca una carta o passa.</p>
       <ul class="touts">
         <li><span class="tv">${tcard('back-asset', 'back')}</span><div><span class="tchip win">Vinci</span><p>+1 o +2 livelli e tesori dal mazzo Asset.</p></div></li>
-        <li><span class="tv"><span class="die" data-v="5" aria-hidden="true">${'<i></i>'.repeat(9)}</span></span><div><span class="tchip lose">Perdi</span><p>Tiri il dado per fuggire: serve 5 o più, al Sysadmin basta 4. Se fallisci subisci la penalità della Minaccia. Con un Rollback scappi senza tirare.</p></div></li>
+        <li><span class="tv"><span class="die" data-v="5" aria-hidden="true">${'<i></i>'.repeat(9)}</span></span><div><span class="tchip lose">Perdi</span><p>Tiri il dado per fuggire: serve 5 o più, al Sysadmin basta 3. Se fallisci subisci la penalità della Minaccia. Con un Rollback scappi senza tirare.</p></div></li>
         <li><span class="tv"><span class="ava" data-seat="0" aria-hidden="true">TU</span><span class="ava" data-seat="1" aria-hidden="true">+</span></span><div><span class="tchip help">Aiuto</span><p>Offri una parte dei tesori: l'altro può accettare, rifiutare o rilanciare. Chi ti aiuta somma la sua forza, ma non sale di livello.</p></div></li>
         <li><span class="tv"><span class="esp" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></span><div><span class="tchip sab">Sabotaggio</span><p>Potenziare la Minaccia di un altro o giocargli una Sfiga costa 1 punto di Esposizione. A 4 scatta l'audit del SOC: perdi 1 livello.</p></div></li>
       </ul>`;
@@ -836,7 +837,7 @@
           ${kind(tcard('level-certificazione-appena-presa', 'levelup'), 'Carte livello', '+1 livello, ma non portano a 10.')}
         </ul></section>
       </div>
-      <p class="tnote">Vendi gli asset per ottenere credito: ogni 1000 vale +1 livello, fino al 9.</p>`;
+      <p class="tnote">Finché sei a livello 1 ricevi un Asset a ogni inizio turno. Vendi gli asset per ottenere credito: ogni 1000 vale +1 livello, fino al 9.</p>`;
   }
   const tut = document.createElement('div');
   tut.id = 'tut'; tut.className = 'hidden';

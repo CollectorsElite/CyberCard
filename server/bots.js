@@ -77,7 +77,10 @@ function pickHelper(g, f, c) {
     if (!(fp > tp || (fp === tp && g.isRole(f, 'red')))) return null;
     const share = p.isBot ? Math.min(tr, Math.ceil(tr / 2) + (f.level > p.level ? 1 : 0)) : Math.max(1, Math.floor(tr / 2));
     return { p, share };
-  }).filter(Boolean).sort((a, b) => a.share - b.share);
+  }).filter(Boolean);
+  // a parità di prezzo chiede a chi è più indietro; tra pari livello, a caso (non sempre al primo del tavolo)
+  cands.forEach(x => { x.tie = g.rng(1000); });
+  cands.sort((a, b) => a.share - b.share || a.p.level - b.p.level || a.tie - b.tie);
   return cands[0] || null;
 }
 

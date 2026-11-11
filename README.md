@@ -81,8 +81,8 @@ Il pubblico è fatto di gente di IT: il client va considerato ostile.
 ## Regole in breve
 
 - **Obiettivo**: primo a livello 10 (*root*). L'ultimo livello si prende solo vincendo un combattimento.
-- **Turno**: apri un ticket (carta scoperta). Minaccia → combatti; Sfiga → la subisci; altro → in mano. Se non hai combattuto puoi *cercare guai* (affronti una Minaccia dalla mano) o *analizzare i log* (peschi coperto). A fine turno massimo 5 carte in mano: scegli tu cosa scartare.
-- **Combattimento**: forza = livello + asset + carte a uso singolo. Dopo la preparazione si apre la **finestra di interferenza**: tutti, compreso chi combatte, devono dichiarare «passo». Ogni carta giocata riapre il giro. Poi: se sei in vantaggio vinci livelli e tesori, altrimenti tiri il dado per fuggire (5+, Sysadmin 4+).
+- **Turno**: finché sei a livello 1, a inizio turno peschi un Asset (dotazione). Poi apri un ticket (carta scoperta). Minaccia → combatti; Sfiga → la subisci; altro → in mano. Se non hai combattuto puoi *cercare guai* (affronti una Minaccia dalla mano) o *analizzare i log* (peschi coperto). A fine turno massimo 5 carte in mano: scegli tu cosa scartare.
+- **Combattimento**: forza = livello + asset + carte a uso singolo. Dopo la preparazione si apre la **finestra di interferenza**: tutti, compreso chi combatte, devono dichiarare «passo». Ogni carta giocata riapre il giro, comprese le Sfighe su chi combatte o su chi lo aiuta. Poi: se sei in vantaggio vinci livelli e tesori, altrimenti tiri il dado per fuggire (5+, Sysadmin 3+).
 - **Aiuto**: chi combatte offre a un avversario una quota dei tesori. L'altro può accettare, rifiutare o rilanciare con un'altra cifra; a quel punto risponde chi combatte, e così via fino a tre controproposte. Chi aiuta somma la sua forza e pesca per primo la sua quota. Non guadagna livelli.
 - **Sabotaggi ed Esposizione**: potenziare la minaccia altrui, aggiungerne una con *Movimento laterale* o giocare una Sfiga su qualcuno (in qualsiasi momento) costa 1 punto di Esposizione. A 4 scatta l'**audit del SOC**: −1 livello e si riparte da zero. L'*Ingegnere sociale* non lascia tracce.
 - **Asset**: uno slot per tipo (Hardware, Software, Credenziali, Gadget). Ci si equipaggia, si cambia ruolo e si vende in qualsiasi momento, mai durante un combattimento. 1000 di credito = +1 livello (fino al 9).
@@ -111,6 +111,8 @@ test/
 npm test
 ```
 
+Per misurare il bilanciamento dopo una modifica a carte o regole c'è `node test/balance.js [partite] [giocatori] [--cards]`: gioca partite tra bot con seme fisso e riporta durata, vantaggio di posto, esiti dei combattimenti per minaccia, fonti di livelli guadagnati e persi, ruoli e turni di stallo. Non fa parte di `npm test`.
+
 ## Interfaccia
 
 Il tavolo è una scrivania vista dall'alto: gli avversari sono badge aziendali in alto, il tappetino al centro ospita mazzi, ticket scoperto e combattimento, in basso ci sono la tua postazione, la mano a ventaglio e le azioni con il timer. Su schermo largo sta tutto in una sola vista; su telefono mano e azioni restano fisse in basso e il resto scorre sopra.
@@ -126,4 +128,4 @@ Le illustrazioni non vengono modificate: `art/build-frames.py` (Python con Pillo
 
 - I bot sono semplici: sabotano soprattutto chi è in testa e accettano l'aiuto solo se il compenso è sufficiente; se è troppo basso rilanciano con la cifra che vogliono.
 - Niente chat in partita: le trattative si fanno a voce o sulla chat che usate già.
-- Il bilanciamento è tarato su simulazioni tra bot (partite di circa 9-10 giri): con persone vere che si coalizzano le partite si allungano. I valori si cambiano in `server/cards.js`.
+- Il bilanciamento è tarato su simulazioni tra bot: mediana 12-13 giri a ogni dimensione del tavolo (da 35 turni giocati in 3 a circa 70 in 6), nove partite su dieci entro 15-17 giri. Con persone vere che si coalizzano contro chi è in testa il finale si allunga. I valori si cambiano in `server/cards.js`.

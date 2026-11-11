@@ -29,7 +29,7 @@ class Game {
       role: null, gear: { hw: null, sw: null, cr: null, gd: null }, hand: [], blueUsed: false
     }));
     this.id = crypto.randomBytes(4).toString('hex');
-    this.logs = []; this.fxs = []; this.seq = 0; this.version = 0;
+    this.logs = []; this.fxs = []; this.seq = 0; this.version = 0; this.quipBag = {}; this.quipLast = {};
     this.turn = 1; this.combat = null; this.revealed = null; this.over = false; this.winner = null;
     for (const p of this.players) p.hand.push(this.draw('T'), this.draw('T'), this.draw('T'), this.draw('A'), this.draw('A'));
     this.cur = this.rng(this.players.length);
@@ -52,7 +52,16 @@ class Game {
     return deck.pop() || null;
   }
   discard(c) { if (c) this.disc[c.deck].push(c); }
-  quip(kind, key) { const a = QUIPS[kind + ':' + key] || QUIPS[kind]; return a[this.rng(a.length)]; }
+  // Battute a sacchetto: tutte quelle di un tipo escono una volta prima che una si ripeta.
+  quip(kind, key) {
+    const k = QUIPS[kind + ':' + key] ? kind + ':' + key : kind, a = QUIPS[k];
+    let bag = this.quipBag[k];
+    if (!bag || !bag.length) {
+      bag = this.quipBag[k] = this.shuffle(a.map((_, i) => i));
+      if (bag.length > 1 && bag[bag.length - 1] === this.quipLast[k]) bag.unshift(bag.pop()); // niente bis a cavallo di due sacchetti
+    }
+    return a[this.quipLast[k] = bag.pop()];
+  }
   say(kind, key) { const q = this.quip(kind, key); this.log(q, 'quip'); return q; }
   removeFromHand(p, c) { const i = p.hand.indexOf(c); if (i < 0) return false; p.hand.splice(i, 1); return true; }
   handCard(p, uid, type) {
@@ -86,7 +95,12 @@ class Game {
     if (!c) return [this.current.id];
     const out = [];
     if (c.step === 'prep') out.push(c.fighter);
-    else if (c.step === 'window') { for (const p of this.players) if (!c.passes.has(p.id)) out.push(p.id); }
+    else if (c.step === 'window') {
+      // giro dei «passo» in ordine di tavolo a partire da chi siede dopo chi combatte (che risponde per ultimo):
+      // così, tra bot, non è sempre il primo della lista a decidere se sabotare
+      const n = this.players.length, f = this.fighter(c).seat;
+      for (let k = 1; k <= n; k++) { const p = this.players[(f + k) % n]; if (!c.passes.has(p.id)) out.push(p.id); }
+    }
     else if (c.step === 'flee') out.push(c.fighter);
     if (c.offer && !out.includes(c.offer.to)) out.push(c.offer.to);
     return out;
@@ -118,6 +132,12 @@ class Game {
     this.phase = 'open'; this.revealed = null;
     const p = this.current; p.blueUsed = false;
     this.log(`Turno di ${p.name}.`, 'turn');
+    // Dotazione: chi è a livello 1 riceve un Asset a inizio turno. Gli Asset si vincono solo in combattimento,
+    // quindi senza questo chi resta senza equipaggiamento non ha modo di rialzarsi.
+    if (p.level === 1) {
+      const c = this.draw('A');
+      if (c) { p.hand.push(c); this.log(`Dotazione per ${p.name}, ancora guest: un Asset dall'IT.`, 'sys'); this.fx({ kind: 'drawn', to: p.id, cards: [c.name] }); }
+    }
     this.setDeadline(this.to.turn);
   }
   a_openTicket(p) {
@@ -224,6 +244,9 @@ class Game {
     if (t === p) fail('Non puoi giocare una Sfiga su te stesso.');
     this.removeFromHand(p, card);
     this.applyCurse(t, card, p);
+    // una Sfiga su chi combatte o su chi aiuta cambia le forze: come ogni altra carta, riapre il giro dei «passo»
+    const c = this.combat;
+    if (c && c.step === 'window' && (t.id === c.fighter || t.id === c.helper)) this.touch(c);
   }
 
   /* ---------- combattimento ---------- */
@@ -340,7 +363,7 @@ class Game {
       this.touch(c);
     } else {
       this.log(p === h ? `${p.name} rifiuta di aiutare ${this.fighter(c).name}.` : `${p.name} rifiuta la controproposta di ${h.name}.`);
-      this.fx({ kind: 'helpNo', by: p.id, to: o.from, quip: this.say('helpNo') });
+      this.fx({ kind: 'helpNo', by: p.id, to: o.from, quip: this.say(p === h ? 'helpNo' : 'counterNo') });
       this.maybeClose();
     }
   }
@@ -355,7 +378,7 @@ class Game {
     const c = this.inCombat(['flee']);
     if (c.fighter !== p.id) fail('Non sei tu a combattere.');
     for (const t of c.threats) {
-      const need = Math.min(6, Math.max(2, (this.isRole(p, 'sys') ? 4 : 5) - t.card.flee));
+      const need = Math.min(6, Math.max(2, (this.isRole(p, 'sys') ? 3 : 5) - t.card.flee));
       const roll = 1 + this.rng(6), ok = roll >= need;
       this.log(`${p.name} tenta la fuga da ${t.card.name}: ${roll} (serve ${need}+), ${ok ? 'scappa' : 'preso'}.`, ok ? '' : 'bad');
       const q = this.say(ok ? 'fleeOk' : 'fleeKo', t.card.bad[0].s || t.card.bad[0].k);
@@ -461,7 +484,7 @@ class Game {
       this.fx({ kind: 'curse', by: by.id, target: t.id, card: card.name, text: this.badText(card.bad), d: card.d });
       this.addEsp(by);
     } else this.log(`${t.name} subisce «${card.name}».`, 'bad');
-    if (this.isRole(t, 'blue') && !t.blueUsed && this.curseMatters(t, card)) {
+    if (sab && this.isRole(t, 'blue') && !t.blueUsed && this.curseMatters(t, card)) {
       t.blueUsed = true; this.discard(card);
       this.log(`${t.name} (Blue Teamer) blocca la Sfiga.`, 'good');
       this.say('block');
