@@ -101,8 +101,11 @@ public/      client (HTML, CSS, JS senza dipendenze)
   cards.css  ritaglio di ogni illustrazione sulla propria cornice (generato, vedi sotto)
   fonts/     Archivo variabile (licenza OFL inclusa)
 art/
-  cards/, board/     illustrazioni delle carte, dorsi e texture del tavolo
-  build-frames.py    rigenera public/cards.css quando cambiano le illustrazioni
+  illustrations/     solo i disegni delle carte, senza cornice né testi
+  card-faces.json    nome e battuta stampati su ogni carta
+  build-cards.py     compone art/cards/ da disegni + testi (cornice, stelle, barre)
+  cards/, board/     carte finite, dorsi e texture del tavolo
+  build-frames.py    rigenera public/cards.css quando cambiano le carte
 test/
   sim.js     partite simulate + fuzzing con azioni ostili, controllo di conservazione delle carte
   ws.js      integrazione: server reale, 3 client WebSocket + 2 bot fino a fine partita
@@ -123,7 +126,9 @@ Il tavolo è una scrivania vista dall'alto: gli avversari sono badge aziendali i
 - Il tiro di fuga compare come dado al centro del tavolo.
 - Ogni zona della partita si ridisegna solo quando cambia: una mossa altrui non tocca la tua mano.
 
-Le illustrazioni non vengono modificate: `art/build-frames.py` (Python con Pillow e numpy) misura la cornice nera di ogni immagine e scrive in `public/cards.css` le percentuali con cui il CSS la fa combaciare con il bordo della carta. Va rilanciato quando si aggiungono o cambiano illustrazioni; `npm test` segnala le carte senza ritaglio.
+Le carte in `art/cards/` sono generate: per cambiare nome o battuta stampati si modifica `art/card-faces.json` e si lancia `python3 art/build-cards.py` (colore e stelle vengono da `art/cards-manifest.json`). Per una carta nuova basta aggiungere il disegno in `art/illustrations/<slug>.jpg` (senza cornice né testi) e la sua riga in `card-faces.json`. Font: Archivo, licenza OFL in `art/fonts/`.
+
+Poi `art/build-frames.py` (Python con Pillow e numpy) misura la cornice nera di ogni immagine e scrive in `public/cards.css` le percentuali con cui il CSS la fa combaciare con il bordo della carta. Va rilanciato quando si aggiungono o cambiano illustrazioni; `npm test` segnala le carte senza ritaglio.
 
 ## Limiti noti
 
