@@ -317,13 +317,18 @@
   }
 
   // Cinque carte vere in apertura: il gioco si presenta con quello che ha di più suo.
-  const HERO = ['curse-reset-password-obbligatorio', 'gear-hw-laptop-pieno-di-adesivi', 'threat-ransomware-con-assistenza-clienti', 'role-red', 'oneshot-caffe-della-macchinetta'];
+  // Una carta per famiglia di colore, la Minaccia al centro.
+  const HERO = ['curse-reset-password-obbligatorio', 'gear-hw-laptop-pieno-di-adesivi', 'threat-ransomware-con-assistenza-clienti', 'trick-change-freeze', 'oneshot-caffe-della-macchinetta'];
+  // Il colore della carta dice la famiglia: stessa legenda in home, wiki e regole.
+  const FAMILIES = [['red', 'Minacce', 'da combattere'], ['violet', 'Sfighe', 'sugli altri, quando vuoi'], ['green', 'Interferenze', 'durante un combattimento'], ['blue', 'Ruoli e uso singolo', 'poteri e colpi di mano'], ['orange', 'Asset e livello', 'equipaggiamento e promozioni']];
+  const famHTML = () => `<ul class="fams" aria-label="I colori delle carte">${FAMILIES.map(([c, n, d]) => `<li class="fam-${c}"><b>${n}</b> ${d}</li>`).join('')}</ul>`;
   function homeHTML() {
     return `<div class="home">
       <div class="home-pitch">
         <div class="herofan" aria-hidden="true">${HERO.map(a => `<span class="card"><span class="face" data-art="${a}"><img src="/cards/${a}.jpg" alt=""></span></span>`).join('')}</div>
         <h1>Arriva a root prima dei colleghi.</h1>
         <p class="lead">Card game di sabotaggi e privilege escalation. Vince chi arriva a root per primo; perde chi lascia tracce nei log. Da 3 a 6 giocatori, con bot per i colleghi che «oggi non riescono».</p>
+        ${famHTML()}
       </div>
       <div class="home-forms">
         <section class="panel"><h2>Crea una stanza</h2>
@@ -801,6 +806,8 @@
   }
 
   const WIKI = { threat: 'Minacce', curse: 'Sfighe', boost: 'Interferenze', lateral: 'Interferenze', role: 'Ruoli', gear: 'Asset', oneshot: 'Uso singolo', levelup: 'Livello' };
+  // ordine dei filtri = ordine dei colori
+  const WIKI_COLOR = { Minacce: 'red', Sfighe: 'violet', Interferenze: 'green', Ruoli: 'blue', 'Uso singolo': 'blue', Asset: 'orange', Livello: 'orange' };
   const wikiOf = x => (x.type === 'trick' ? (x.deck === 'T' ? 'Interferenze' : 'Uso singolo') : WIKI[x.type]);
   function loadCatalog() {
     if (S.catalog) return;
@@ -813,7 +820,7 @@
     if (!all.length) return '<p>Caricamento del catalogo…</p>';
     if (c) return `<button type="button" class="btn" data-m="back">← Tutte le carte</button>
       <h4>${esc(c.name)}</h4><p class="kind">mazzo ${c.deck === 'T' ? 'Ticket' : 'Asset'} · ${c.n} ${pl(c.n, 'copia', 'copie')}</p>${cardDetail(c)}`;
-    return `<div class="wiki-f">${[...new Set(Object.values(WIKI))].map(g => `<button type="button" class="btn${g === st.f ? ' primary' : ''}" data-m="f:${g}" aria-pressed="${g === st.f}">${g}</button>`).join('')}</div>
+    return `<div class="wiki-f">${Object.keys(WIKI_COLOR).map(g => `<button type="button" class="btn fam-${WIKI_COLOR[g]}${g === st.f ? ' primary' : ''}" data-m="f:${g}" aria-pressed="${g === st.f}">${g}</button>`).join('')}</div>
       <div class="wiki">${all.map((x, i) => wikiOf(x) !== st.f ? '' : `<button type="button" class="wiki-i" data-m="c:${i}"><span class="face" data-art="${artSlug(x)}"><img src="/cards/${artSlug(x)}.jpg" alt="" loading="lazy"></span><span>${esc(x.name)}</span><small>×${x.n}</small></button>`).join('')}</div>`;
   }
   function openRules() {
@@ -838,6 +845,7 @@
         <h4>Le carte</h4><ul>
         <li><b>Mazzo Ticket</b>: Minacce da combattere, Sfighe da giocare sugli altri, Ruoli, Interferenze che cambiano un combattimento (forza in più o in meno, aiutanti portati via, sabotaggi annullati).</li>
         <li><b>Mazzo Asset</b>: equipaggiamento per i 4 slot, carte a uso singolo (bonus, fughe, scaricabarile) e carte livello.</li></ul>
+        <p>Il colore dice la famiglia della carta:</p>${famHTML()}
         <p>Cosa fa ogni carta, con forza, effetti e numero di copie: scheda <b>Wiki carte</b> qui sopra.</p>
         <h4>Il tuo turno</h4><ul>
         <li><b>Dotazione</b>: finché sei a livello 1, a inizio turno peschi un Asset.</li>
@@ -859,7 +867,7 @@
   const TUT = [
     ["Obiettivo e turno", "Da livello 1 a livello 10, root: vince chi ci arriva per primo. L'ultimo livello si prende solo battendo una Minaccia."],
     ["Combattimento", "Serve più forza della Minaccia. Il pareggio lo vince solo il Red Teamer."],
-    ["Le carte", "Due mazzi. Si parte con 3 Ticket e 2 Asset in mano."]
+    ["Le carte", "Due mazzi, cinque colori. Si parte con 3 Ticket e 2 Asset in mano."]
   ];
   // Le qualifiche dei dieci livelli, come in server/cards.js (test/art.js controlla che coincidano).
   const LADDER = ['guest', 'stagista', 'utente', 'power user', 'helpdesk', 'tecnico', 'senior', 'domain admin', 'enterprise admin', 'root'];
@@ -896,7 +904,7 @@
           ${kind(tcard('threat-ransomware-con-assistenza-clienti', 'threat', '11'), 'Minacce', 'Da combattere. Il numero è la loro forza.')}
           ${kind(tcard('curse-reset-password-obbligatorio', 'curse'), 'Sfighe', 'Le giochi sugli altri, quando vuoi.')}
           ${kind(tcard('role-red', 'role'), 'Ruoli', 'Un potere speciale. Uno alla volta.')}
-          ${kind(tcard('boost-zero-day-fresco', 'boost', '+10'), 'Interferenze', 'Cambiano un combattimento: forza alla Minaccia, aiutanti portati via, sabotaggi annullati.')}
+          ${kind(tcard('boost-zero-day-fresco', 'boost', '+10'), 'Interferenze', 'Verdi, si giocano in combattimento: forza alla Minaccia, aiutanti portati via, sabotaggi annullati.')}
         </ul></section>
         <section><div class="tdeck">${tcard('back-asset', 'back')}<h5>Mazzo Asset</h5></div><ul class="tkinds">
           ${kind(tcard('gear-hw-laptop-pieno-di-adesivi', 'gear', '+1'), 'Equipaggiamento', 'Un asset per slot: Hardware, Software, Credenziali, Gadget.')}

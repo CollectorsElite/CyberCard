@@ -654,3 +654,16 @@ body.ingame #app{height:100dvh;min-height:0}
   .splash{animation:none}
   .ttrack{scroll-behavior:auto}
 }
+
+/* legenda dei colori delle carte (home, regole) e filtri della wiki */
+.fams{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 0;padding:0;list-style:none;font-size:13.5px;line-height:1.3}
+.fams li{display:flex;align-items:baseline;gap:6px}
+.fams li::before,.wiki-f .btn[class*="fam-"]::before{content:"";flex:none;width:12px;height:12px;border-radius:3px;border:2px solid var(--ink);background:var(--fc);transform:translateY(1px)}
+.fams b{font-weight:800}
+.home .fams{color:var(--cream,#f5ecd9);opacity:.92}
+.fams{flex-direction:column}
+.rules .fams{margin:4px 0 10px}
+.wiki-f{gap:5px}
+.wiki-f .btn[class*="fam-"]{display:inline-flex;align-items:center;gap:5px;padding:7px 8px;font-size:13px}
+.wiki-f .btn[class*="fam-"]::before{width:9px;height:9px}
+.fam-red{--fc:var(--red)}.fam-violet{--fc:var(--violet)}.fam-green{--fc:var(--green)}.fam-blue{--fc:var(--blue)}.fam-orange{--fc:var(--orange)}
