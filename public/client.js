@@ -410,12 +410,12 @@
     if (c) {
       const f = P(c.fighter), h = c.helper ? P(c.helper) : null;
       const fdet = [`livello ${f.level}`, `asset +${sumGear(f)}`];
-      if (c.fBonus) fdet.push(`bonus +${c.fBonus}`);
+      if (c.fBonus) fdet.push(`bonus ${c.fBonus > 0 ? '+' : '−'}${Math.abs(c.fBonus)}`); // negativo se l'IA ha allucinato
       if (f.penalty) fdet.push(`policy −${f.penalty}`);
       if (h) fdet.push(`${h.name} +${h.power}`);
       const multi = c.threats.length > 1;
       const mdet = multi ? c.threats.map(t => `${t.card.name} ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`) : c.threats.map(t => `forza ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`);
-      if (c.mBonus) mdet.push(`interferenze ${c.mBonus > 0 ? '+' : ''}${c.mBonus}`);
+      if (c.mBonus) mdet.push(`interferenze ${c.mBonus > 0 ? '+' : '−'}${Math.abs(c.mBonus)}`);
       let k = 'Combattimento', m = '';
       const mineFight = c.fighter === S.you;
       if (c.step === 'prep') { k = 'Preparazione'; m = mineFight ? 'Usa carte o chiedi aiuto, poi combatti.' : `${esc(f.name)} si prepara. Poi tocca a tutti dire «passo».`; }
