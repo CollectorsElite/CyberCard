@@ -101,10 +101,8 @@ public/      client (HTML, CSS, JS senza dipendenze)
   cards.css  ritaglio di ogni illustrazione sulla propria cornice (generato, vedi sotto)
   fonts/     Archivo variabile (licenza OFL inclusa)
 art/
-  illustrations/     solo i disegni delle carte, senza cornice né testi
-  card-faces.json    nome e battuta stampati su ogni carta
-  build-cards.py     compone art/cards/ da disegni + testi (cornice, stelle, barre)
-  cards/, board/     carte finite, dorsi e texture del tavolo
+  cards/, board/     carte finite (JPG), dorsi e texture del tavolo
+  recolor-cards.py   porta nel gioco le carte originali (PNG viola) ricolorate per famiglia
   build-frames.py    rigenera public/cards.css quando cambiano le carte
 test/
   sim.js     partite simulate + fuzzing con azioni ostili, controllo di conservazione delle carte
@@ -126,7 +124,7 @@ Il tavolo è una scrivania vista dall'alto: gli avversari sono badge aziendali i
 - Il tiro di fuga compare come dado al centro del tavolo.
 - Ogni zona della partita si ridisegna solo quando cambia: una mossa altrui non tocca la tua mano.
 
-Le carte in `art/cards/` sono generate: per cambiare nome o battuta stampati si modifica `art/card-faces.json` e si lancia `python3 art/build-cards.py` (colore e stelle vengono da `art/cards-manifest.json`). Per una carta nuova basta aggiungere il disegno in `art/illustrations/<slug>.jpg` (senza cornice né testi) e la sua riga in `card-faces.json`. Font: Archivo, licenza OFL in `art/fonts/`.
+Le carte in `art/cards/` vengono dall'archivio «Carte Cybersecurity PNG» (98 carte, regole stampate), ricolorate per famiglia: rosso Minacce, viola Sfighe, verde Interferenze, blu Ruoli e carte a uso singolo, oro Asset e carte livello. Per rifarle: `python3 art/recolor-cards.py <cartella dei PNG>` (abbina i file per nome; il colore viene da `art/cards-manifest.json`). Le regole sono stampate sulle carte: se cambia il bilanciamento in `server/cards.js`, le carte toccate vanno rigenerate.
 
 Poi `art/build-frames.py` (Python con Pillow e numpy) misura la cornice nera di ogni immagine e scrive in `public/cards.css` le percentuali con cui il CSS la fa combaciare con il bordo della carta. Va rilanciato quando si aggiungono o cambiano illustrazioni; `npm test` segnala le carte senza ritaglio.
 

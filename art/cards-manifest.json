@@ -393,56 +393,56 @@
   },
   {
     "slug": "boost-patch-mai-applicata",
-    "color": "gold",
+    "color": "green",
     "name": "Patch mai applicata",
     "text": "In coda dal 2021.",
     "stars": 3
   },
   {
     "slug": "boost-zero-day-fresco",
-    "color": "gold",
+    "color": "green",
     "name": "Zero-day fresco",
     "text": "Appena uscito da un forum che non nomineremo.",
     "stars": 4
   },
   {
     "slug": "boost-versione-beta",
-    "color": "gold",
+    "color": "green",
     "name": "Versione beta",
     "text": "Si pianta da sola. Più debole, ma rende meno.",
     "stars": 2
   },
   {
     "slug": "boost-priorita-dal-ceo",
-    "color": "gold",
+    "color": "green",
     "name": "Priorità dal CEO",
     "text": "Oggetto: «URGENTISSIMO». Testo: «vedi sopra». Sopra non c'è niente.",
     "stars": 3
   },
   {
     "slug": "trick-hai-un-minuto",
-    "color": "purple",
+    "color": "green",
     "name": "«Hai un minuto?»",
     "text": "Non era un minuto. Non lo è mai.",
     "stars": 3
   },
   {
     "slug": "trick-change-freeze",
-    "color": "purple",
+    "color": "green",
     "name": "Change freeze",
     "text": "Fino a lunedì non si tocca niente. Nemmeno quello che è rotto.",
     "stars": 3
   },
   {
     "slug": "trick-honeypot",
-    "color": "purple",
+    "color": "green",
     "name": "Honeypot",
     "text": "Sembrava un server dimenticato. Aveva i log accesi.",
     "stars": 3
   },
   {
     "slug": "trick-falso-positivo",
-    "color": "purple",
+    "color": "green",
     "name": "Falso positivo",
     "text": "Il SOC chiude il ticket: non era niente. Forse.",
     "stars": 3
@@ -491,7 +491,7 @@
   },
   {
     "slug": "lateral-movimento",
-    "color": "purple",
+    "color": "green",
     "name": "Movimento laterale",
     "text": "L'attaccante si sposta. Su di te.",
     "stars": 3

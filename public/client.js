@@ -174,7 +174,7 @@
   const faceHTML = (c, cls = '') => { const a = artSlug(c); return `<span class="face${cls ? ' ' + cls : ''}" data-art="${a}"><img src="/cards/${a}.jpg" alt="" decoding="async" draggable="false"></span>`; };
   const backHTML = k => `<span class="face" data-art="back-${k}"><img src="/board/back-${k}.jpg" alt="" draggable="false"></span>`;
   function cardHTML(c, opt = {}) {
-    const cls = ['card', 'k-' + c.type, opt.lg && 'lg', opt.mini && 'mini', opt.sel && 'sel', opt.can && 'can', opt.fresh && 'in'].filter(Boolean).join(' ');
+    const cls = ['card', 'k-' + c.type, c.type === 'trick' && 'k-trick-' + c.deck, opt.lg && 'lg', opt.mini && 'mini', opt.sel && 'sel', opt.can && 'can', opt.fresh && 'in'].filter(Boolean).join(' ');
     return `<button type="button" class="${cls}" data-uid="${c.uid}"${opt.m ? ` data-m="${opt.m}"` : ''} aria-label="${esc(c.name)}">${faceHTML(c)}${cardTag(c) ? `<span class="tag">${cardTag(c)}</span>` : ''}</button>`;
   }
   // Iniziali per il badge: due parole, altrimenti le prime due lettere.

@@ -94,9 +94,11 @@ a.hbtn{text-decoration:none;display:inline-block}
 .face{position:absolute;inset:0;overflow:hidden;border-radius:inherit;background:#000;pointer-events:none}
 .face img{position:absolute;display:block;max-width:none;height:auto;width:var(--w,115%);left:var(--l,-7.5%);top:var(--t,-3.6%)}
 .card .tag{position:absolute;top:calc(var(--cw)*-.05);left:calc(var(--cw)*-.05);min-width:calc(var(--cw)*.27);height:calc(var(--cw)*.27);padding:0 calc(var(--cw)*.04);border-radius:999px;background:var(--k);color:var(--kt,var(--text));border:max(2px,calc(var(--cw)*.022)) solid var(--ink);display:grid;place-items:center;font-size:calc(var(--cw)*.15);font-weight:900;font-stretch:80%;line-height:1;font-variant-numeric:tabular-nums;pointer-events:none}
-.k-threat{--k:var(--red);--kt:#fff6ea}.k-curse,.k-lateral{--k:var(--violet);--kt:#fff6ea}.k-boost{--k:var(--violet);--kt:#fff6ea}
-.k-trick{--k:var(--violet);--kt:#fff6ea}
-.k-gear,.k-oneshot{--k:var(--orange)}.k-role{--k:var(--blue);--kt:#fff6ea}.k-levelup{--k:var(--green);--kt:#fff6ea}
+/* stessi colori delle carte: rosso Minacce, viola Sfighe, verde Interferenze, blu Ruoli e uso singolo, oro Asset e livello */
+.k-threat{--k:var(--red);--kt:#fff6ea}.k-curse{--k:var(--violet);--kt:#fff6ea}
+.k-boost,.k-lateral,.k-trick-T{--k:var(--green);--kt:#fff6ea}
+.k-role,.k-oneshot,.k-trick-A{--k:var(--blue);--kt:#fff6ea}
+.k-gear,.k-levelup{--k:var(--orange)}
 .card.mini{--cw:28px;border-radius:3px;box-shadow:1px 2px 0 rgba(6,8,16,.85)}
 .card.mini .tag{display:none}
 .card.sel{outline:4px solid var(--red);outline-offset:2px}
