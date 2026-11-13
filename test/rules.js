@@ -14,6 +14,8 @@ const take = (g, pred) => {
   for (const pile of [g.decks.T, ...g.players.map(p => p.hand)]) { const i = pile.findIndex(pred); if (i >= 0) return pile.splice(i, 1)[0]; }
   assert.fail('carta non trovata');
 };
+// una Sfiga di prova: così i test non dipendono da quante copie ne ha il mazzo
+const mkCurse = i => ({ deck: 'T', type: 'curse', name: 'Sfiga di prova', bad: [{ k: 'penalty', n: 2 }], bt: '', d: 'Di prova.', uid: 80000 + i });
 const endTurn = g => { const p = g.current; if (g.phase === 'open') g.phase = 'end'; g.handle(p.id, { type: 'endTurn', discard: g.autoDiscard(p) }); };
 
 // 1. Dotazione: a livello 1 si pesca un Asset a inizio turno; dal livello 2 non più
@@ -42,7 +44,7 @@ const endTurn = g => { const p = g.current; if (g.phase === 'open') g.phase = 'e
 {
   const g = setup(), f = g.players[0], s = g.players[1], o = g.players[2];
   const threat = take(g, c => c.type === 'threat' && c.l === 1);
-  const curse = take(g, c => c.type === 'curse' && c.bad[0].k === 'penalty');
+  const curse = mkCurse(1);
   s.hand.push(curse); f.level = 3;
   g.startCombat(f, [threat]);
   g.handle(f.id, { type: 'fight' });
@@ -52,20 +54,20 @@ const endTurn = g => { const p = g.current; if (g.phase === 'open') g.phase = 'e
   assert.strictEqual(g.combat.passes.size, 0, 'chi combatte deve poter rispondere alla Sfiga');
   assert(g.needs().includes(f.id));
   // su un giocatore estraneo al combattimento non riapre nulla
-  const c2 = take(g, c => c.type === 'curse' && c.bad[0].k === 'penalty'); s.hand.push(c2);
+  const c2 = mkCurse(2); s.hand.push(c2);
   g.handle(f.id, { type: 'pass' });
   g.handle(s.id, { type: 'curse', card: c2.uid, target: o.id });
   assert.strictEqual(g.combat.passes.size, 1);
 }
 
-// 3. Blue Teamer: blocca la prima Sfiga giocata da un avversario, non quella pescata aprendo un ticket
+// 3. Blue Teamer: blocca la prima Sfiga giocata da un avversario, non una penalità che non viene da un avversario
 {
   const g = setup(), b = g.players[0], s = g.players[1];
   b.role = take(g, c => c.type === 'role' && c.role === 'blue'); b.blueUsed = false;
-  const c1 = take(g, c => c.type === 'curse' && c.bad[0].k === 'penalty');
+  const c1 = mkCurse(3);
   g.applyCurse(b, c1, null);
-  assert(b.penalty > 0 && !b.blueUsed, 'la Sfiga da ticket non viene bloccata e non consuma il blocco');
-  const before = b.penalty, c2 = take(g, c => c.type === 'curse' && c.bad[0].k === 'penalty'), c3 = take(g, c => c.type === 'curse' && c.bad[0].k === 'penalty');
+  assert(b.penalty > 0 && !b.blueUsed, 'senza un avversario dietro non c\'è niente da bloccare, e lo scudo resta');
+  const before = b.penalty, c2 = mkCurse(4), c3 = mkCurse(5);
   g.applyCurse(b, c2, s);
   assert.strictEqual(b.penalty, before, 'la prima Sfiga di un avversario è bloccata');
   assert.strictEqual(s.esp, 1, 'chi la gioca prende comunque Esposizione');

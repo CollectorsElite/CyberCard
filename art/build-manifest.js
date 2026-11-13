@@ -11,6 +11,8 @@ for (const t of c.CURSES) {
 }
 for (const [k, r] of Object.entries(c.ROLES)) out.push({ slug: 'role-' + k, color: 'blue', name: r.name, text: r.text, stars: 4 });
 for (const b of c.BOOSTS) out.push({ slug: 'boost-' + slug(b.n), color: 'gold', name: b.n, text: b.d, stars: b.amt >= 10 ? 4 : b.amt < 0 ? 2 : 3 });
+for (const t of c.TRICKS_T) out.push({ slug: 'trick-' + slug(t[1]), color: 'purple', name: t[1], text: t[3], stars: 3 });
+for (const t of c.TRICKS_A) out.push({ slug: 'trick-' + slug(t[1]), color: 'blue', name: t[1], text: t[4], stars: 3 });
 out.push({ slug: 'lateral-movimento', color: 'purple', name: 'Movimento laterale', text: "L'attaccante si sposta. Su di te.", stars: 3 });
 for (const g of c.GEAR) out.push({ slug: 'gear-' + g[0] + '-' + slug(g[1]), color: 'gold', name: g[1], text: g[4], stars: Math.min(5, Math.max(1, g[2])) });
 for (const o of c.ONESHOTS) out.push({ slug: 'oneshot-' + slug(o[0]), color: 'blue', name: o[0], text: o[4], stars: Math.min(5, Math.max(1, o[1] - 1)) });

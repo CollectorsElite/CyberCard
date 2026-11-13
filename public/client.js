@@ -136,6 +136,18 @@
       case 'audit': toast(e.pid === me ? `Audit del SOC: troppe tracce, perdi 1 livello.${q}` : `Audit del SOC su ${name(e.pid)}.${q}`, e.pid === me ? 'bad' : 'warn', 7000); break;
       case 'win': if (e.pid === me) toast(`Minaccia neutralizzata: sei a livello ${e.level}.${q}`, 'good', 7000); break;
       case 'kept': toast(`Va in mano: ${e.card}.`, 'good', 5000); break;
+      case 'skip': toast(e.pid === me ? `Salti questo turno.${q}` : `${name(e.pid)} salta il turno.${q}`, e.pid === me ? 'bad' : 'warn', 6000); break;
+      case 'bounce':
+        if (e.target === me) toast(`${name(e.by)} è fuori ufficio: «${e.card}» torna a te. ${e.text}.${q}`, 'bad', 8000);
+        else if (e.by === me) toast(`Risposta automatica: «${e.card}» torna a ${name(e.target)}.`, 'good', 6000);
+        break;
+      case 'freeze': toast(`${e.by === me ? 'Hai dichiarato' : name(e.by) + ' dichiara'} il Change freeze: ora si può solo passare.${q}`, 'warn', 7000); break;
+      case 'honeypot': if (e.target === me) toast(`Honeypot di ${name(e.by)}: il tuo «${e.card}» è annullato e prendi +1 Esposizione.${q}`, 'bad', 8000); break;
+      case 'oncall': if (e.target === me) toast(`${name(e.by)} ti mette di reperibilità: lo aiuti gratis.${q}`, 'warn', 8000); break;
+      case 'scapegoat': if (e.target === me) toast(`${name(e.by)} ti indica come capro espiatorio: se lo prendono, paghi tu.`, 'bad', 8000); break;
+      case 'reassign': if (e.target === me) toast(`${name(e.by)} ti riassegna il ticket: ora combatti tu contro ${e.threat}.`, 'bad', 9000); break;
+      case 'falsepos': if (e.target === me && e.by !== me) toast(`${name(e.by)}: Falso positivo. Combattimento annullato.${q}`, 'warn', 7000); break;
+      case 'swap': if (e.a === me || e.b === me) toast(`Scambio di mano con ${name(e.a === me ? e.b : e.a)}: guarda cosa ti è arrivato.`, 'warn', 8000); break;
       case 'drawn': toast(`Peschi: ${e.cards.join(', ')}.`, 'good', 6000); break;
       case 'gameover': toast(`${e.winner === me ? 'Hai ottenuto root. Hai vinto.' : name(e.winner) + ' ha ottenuto root.'}${q}`, e.winner === me ? 'good' : 'warn', 10000); break;
     }
@@ -149,28 +161,15 @@
     el.setAttribute('role', 'status');
     el.innerHTML = `<p class="splash-k">${mine ? 'Tenti la fuga' : esc(name(e.pid)) + ' tenta la fuga'} da ${esc(e.threat)}</p>
       <div class="splash-roll"><span class="die" data-v="${+e.roll}" aria-label="Dado: ${+e.roll}">${'<i></i>'.repeat(9)}</span><span class="need">serve ${+e.need}+</span></div>
-      <p class="splash-r">${e.ok ? (mine ? 'Ti disconnetti in tempo.' : 'Scappa.') : (mine ? 'Ti prende: ' : 'Preso: ') + esc(e.bad) + '.'}</p>${e.quip ? `<p class="splash-q">«${esc(e.quip)}»</p>` : ''}`;
+      <p class="splash-r">${e.ok ? (mine ? 'Ti disconnetti in tempo.' : 'Scappa.') : e.victim ? `Preso, ma paga ${esc(e.victim === S.you ? 'il capro espiatorio: tu' : name(e.victim))}: ${esc(e.bad)}.` : (mine ? 'Ti prende: ' : 'Preso: ') + esc(e.bad) + '.'}</p>${e.quip ? `<p class="splash-q">«${esc(e.quip)}»</p>` : ''}`;
     document.querySelectorAll('.splash').forEach(x => x.remove());
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 4200);
   }
 
   /* ================= carte ================= */
-  function badText(effects) {
-    return effects.map(e => {
-      switch (e.k) {
-        case 'lvl': return `perdi ${e.n} ${pl(e.n, 'livello', 'livelli')}`;
-        case 'slot': return `perdi l'asset ${SLOTS[e.s]}`;
-        case 'hand': return e.n >= 99 ? 'scarti tutta la mano' : `scarti ${e.n} ${pl(e.n, 'carta', 'carte')}`;
-        case 'gearAll': return 'perdi tutto l\'equipaggiamento';
-        case 'role': return 'perdi il ruolo';
-        case 'best': return 'perdi l\'asset migliore';
-        case 'penalty': return `−${e.n} al prossimo combattimento`;
-        case 'wipe': return 'perdi equipaggiamento, ruolo e mano';
-      }
-      return '';
-    }).join(', ');
-  }
+  // Il testo delle penalità lo scrive il server (server/cards.js) e ogni carta lo porta in `bt`.
+  const badText = c => c.bt || '';
   // Illustrazione ritagliata sulla propria cornice: le percentuali arrivano da /cards.css (art/build-frames.py).
   const faceHTML = (c, cls = '') => { const a = artSlug(c); return `<span class="face${cls ? ' ' + cls : ''}" data-art="${a}"><img src="/cards/${a}.jpg" alt="" decoding="async" draggable="false"></span>`; };
   const backHTML = k => `<span class="face" data-art="back-${k}"><img src="/board/back-${k}.jpg" alt="" draggable="false"></span>`;
@@ -193,6 +192,8 @@
     return (c.type || 'card') + '-' + slug(c.name);
   }
   const KIND = { threat: 'Minaccia', curse: 'Sfiga', boost: 'Interferenza', lateral: 'Interferenza', role: 'Ruolo', gear: 'Asset', oneshot: 'Uso singolo', levelup: 'Carta livello' };
+  // Le carte speciali stanno in tutti e due i mazzi: nel Ticket sono Interferenze, nell'Asset carte a uso singolo.
+  const kindOf = c => (c.type === 'trick' ? (c.deck === 'T' ? 'Interferenza' : 'Uso singolo') : KIND[c.type] || '');
   function cardTag(c) {
     if (c.type === 'threat') return String(c.l);
     if (c.type === 'gear' || (c.type === 'oneshot' && !c.escape)) return '+' + c.bonus;
@@ -205,20 +206,21 @@
     switch (c.type) {
       case 'threat':
         R.push(`Forza ${c.l}`, `Se vinci: +${c.lv} ${pl(c.lv, 'livello', 'livelli')} e ${c.tr} ${pl(c.tr, 'tesoro', 'tesori')}`);
-        bad = `Se non scappi: ${badText(c.bad)}`;
+        bad = `Se non scappi: ${badText(c)}`;
         if (c.vs) R.push(`+${c.vs.n} contro ${(ROLES[c.vs.role] || { name: c.vs.role }).name}`);
         if (c.flee > 0) R.push(`Più facile da cui fuggire (+${c.flee} al dado)`);
         if (c.flee < 0) R.push(`Più difficile da cui fuggire (${c.flee} al dado)`);
         break;
-      case 'curse': R.push(`Chi la subisce: ${badText(c.bad)}`, 'Giocabile su chiunque, in qualsiasi momento. Ti costa 1 punto di Esposizione.'); break;
+      case 'curse': R.push(`Chi la subisce: ${badText(c)}`, 'Giocabile su chiunque, in qualsiasi momento. Ti costa 1 punto di Esposizione.'); break;
       case 'role': R.push((ROLES[c.role] || { text: '' }).text, 'Un solo ruolo alla volta.'); break;
-      case 'boost': R.push(`${c.amt > 0 ? '+' : ''}${c.amt} alla minaccia, ${c.tr > 0 ? '+' : ''}${c.tr} ${pl(Math.abs(c.tr), 'tesoro', 'tesori')}`, c.amt > 0 ? 'Sul combattimento di un altro è un sabotaggio: +1 Esposizione.' : 'Indebolisce la minaccia: nessuna Esposizione.'); break;
+      case 'boost': R.push(`${c.amt > 0 ? '+' : ''}${c.amt} alla minaccia, ${c.tr > 0 ? '+' : ''}${c.tr} ${pl(Math.abs(c.tr), 'tesoro', 'tesori')}${c.lv ? `, +${c.lv} ${pl(c.lv, 'livello', 'livelli')} a chi la batte` : ''}`, c.amt > 0 ? 'Sul combattimento di un altro è un sabotaggio: +1 Esposizione.' : 'Indebolisce la minaccia: nessuna Esposizione.'); break;
       case 'lateral': R.push('Durante un combattimento aggiunge una Minaccia dalla tua mano.', 'Sul combattimento di un altro è un sabotaggio: +1 Esposizione.'); break;
       case 'gear': R.push(`Slot ${SLOTS[c.slot]} · +${c.bonus} · valore ${c.value}`); if (c.roleBonus) R.push(`+${c.roleBonus.n} extra per ${(ROLES[c.roleBonus.role] || { name: c.roleBonus.role }).name}`); break;
       case 'oneshot': R.push(c.escape ? 'Quando devi fuggire: ti sganci senza tirare il dado.' : `+${c.bonus} a una delle due parti di un combattimento qualsiasi.`, `Valore ${c.value}`); break;
       case 'levelup': R.push('+1 livello in qualsiasi momento, fuori dal combattimento. Non porta a 10.'); break;
+      case 'trick': R.push(c.text || ''); if (c.value) R.push(`Valore ${c.value}`); break;
     }
-    return `<p class="kind">${KIND[c.type] || ''}</p><ul class="fx">${R.map(r => `<li>${esc(r)}</li>`).join('')}</ul>${bad ? `<p class="pen">${esc(bad)}</p>` : ''}${c.d && c.type !== 'role' ? `<p class="flav">«${esc(c.d)}»</p>` : ''}`;
+    return `<p class="kind">${kindOf(c)}</p><ul class="fx">${R.map(r => `<li>${esc(r)}</li>`).join('')}</ul>${bad ? `<p class="pen">${esc(bad)}</p>` : ''}${c.d && c.type !== 'role' ? `<p class="flav">«${esc(c.d)}»</p>` : ''}`;
   }
   function cardDetail(c) {
     if (!c) return '';
@@ -272,6 +274,10 @@
     if (peek._el && !peek._el.isConnected) hidePeek();
     if (S.modal) renderModal();
   }
+  // Il registro è un contenitore «column-reverse»: il browser lo tiene ancorato all'ultima riga anche
+  // quando il contenuto cresce (font, immagini). Lì scrollTop vale 0 in fondo e scende sotto zero risalendo.
+  const logRev = el => getComputedStyle(el).flexDirection === 'column-reverse';
+  const logGap = el => (logRev(el) ? -el.scrollTop : el.scrollHeight - el.scrollTop - el.clientHeight);
   function renderGame(scr) {
     const v = V(), me = ME(), n = v.players.length;
     $('#hinfo').textContent = `${S.room.code}, giro ${v.turn}`;
@@ -287,10 +293,21 @@
     paint($('#piles'), pilesHTML(), '_k');
     paint($('#arena'), arenaHTML(), '_k');
     S.shownUid = v.revealed ? v.revealed.card.uid : null;
-    const log = $('#log'), ls = log.scrollTop;
-    log.classList.toggle('open', S.logOpen);
+    // Il registro segue gli eventi: resta agganciato in fondo, a meno che tu non sia risalito a rileggere.
+    const log = $('#log'), ls = log.scrollTop, h0 = log.scrollHeight;
+    const opened = S.logOpen && !log._open;
+    const atEnd = !log._k || log._open !== S.logOpen || logGap(log) < 48;
+    const lastI = v.log && v.log.length ? v.log[v.log.length - 1].i : 0;
+    if (atEnd) S.logNew = false; else if (lastI > (S.logSeen || 0)) S.logNew = true;
+    S.logSeen = lastI;
+    log.classList.toggle('open', S.logOpen); log._open = S.logOpen;
     log.setAttribute('aria-expanded', S.logOpen ? 'true' : 'false');
-    if (paint(log, logHTML(), '_k')) log.scrollTop = ls;
+    if (paint(log, logHTML(), '_k') || atEnd) {
+      const rev = logRev(log);
+      if (atEnd) log.scrollTop = rev ? 0 : log.scrollHeight;
+      else log.scrollTop = rev ? ls - (log.scrollHeight - h0) : ls; // chi sta rileggendo resta dov'era
+    }
+    if (opened) log.scrollIntoView({ block: 'end' }); // su telefono il registro aperto sta in fondo al tavolo: portalo in vista
     $('#me').classList.toggle('active', v.cur === S.you && !v.over);
     paint($('#me'), meHTML(me), '_k');
     paint($('#handwrap'), handHTML(), '_k');
@@ -356,6 +373,8 @@
       </section></div>`;
   }
 
+  // Segnalini temporanei: turno da saltare, Risposta automatica attiva.
+  const flags = p => `${p.skip ? ' <span class="badge skip" title="Salta il prossimo turno">salta il turno</span>' : ''}${p.ooo ? ' <span class="badge ooo" title="Risposta automatica: la prossima Sfiga torna al mittente">fuori ufficio</span>' : ''}`;
   function oppHTML(p) {
     const v = V(), c = v.combat, m = member(p.id);
     const turn = v.cur === p.id && !v.over;
@@ -370,7 +389,7 @@
     const off = m && !m.connected, gear = p.gear || {};
     return `<div class="opp${turn ? ' active' : ''}${off ? ' off' : ''}" data-pid="${esc(p.id)}" data-seat="${p.seat}" role="button" tabindex="0" aria-label="${esc(p.name)}, livello ${p.level}">${st}
       <div class="id">${avaHTML(p)}
-        <div class="who"><div class="on">${esc(p.name)}</div><div class="tt">${esc(p.title)}${p.isBot ? ' <span class="badge bot">bot</span>' : off ? ' <span class="badge off">offline</span>' : ''}</div></div>
+        <div class="who"><div class="on">${esc(p.name)}</div><div class="tt">${esc(p.title)}${p.isBot ? ' <span class="badge bot">bot</span>' : off ? ' <span class="badge off">offline</span>' : ''}${flags(p)}</div></div>
         <span class="lvl" title="Livello">${p.level}</span></div>
       <div class="ostats"><span><small>Forza</small><b>${p.power - p.penalty}</b></span><span><small>Carte</small><b>${p.handCount}</b></span><span class="oesp"><small><span class="lg-only">Esposizione</span><span class="sm-only" title="Esposizione">Esp.</span></small>${espPips(p)}</span></div>
       <div class="minis">${p.role ? cardHTML(p.role, { mini: true }) : '<span class="oslot" title="Nessun ruolo">Ruolo</span>'}${Object.keys(SLOTS).map(s => gear[s] ? cardHTML(gear[s], { mini: true }) : `<span class="oslot" title="${SLOTS[s]}: vuoto">${s.toUpperCase()}</span>`).join('')}</div></div>`;
@@ -404,8 +423,8 @@
         // chi manca si legge sui badge («decide» / «passo»): qui basta il conto, o i nomi se sono pochi
         const waiting = v.players.filter(p => !passed(p.id)).map(p => p.id === S.you ? 'tu' : p.name);
         const left = waiting.length > 2 ? `Devono ancora decidere in ${waiting.length}.` : `${waiting.length === 1 ? 'Manca' : 'Mancano'} ${esc(waiting.join(' e ') || 'nessuno')}.`;
-        k = 'Finestra di interferenza';
-        m = passed(S.you) ? `Hai passato. ${left}` : `Gioca una carta o passa. ${left}`;
+        k = c.frozen ? 'Change freeze' : 'Finestra di interferenza';
+        m = passed(S.you) ? `Hai passato. ${left}` : c.frozen ? `Non si gioca più niente: si può solo passare. ${left}` : `Gioca una carta o passa. ${left}`;
       } else if (c.step === 'flee') { k = 'Fuga'; m = mineFight ? 'Sei in svantaggio: tira il dado.' : `${esc(f.name)} deve tentare la fuga.`; }
       if (c.offer) {
         const o = c.offer, n = `${o.share} ${pl(o.share, 'tesoro', 'tesori')}`;
@@ -434,7 +453,7 @@
       k = 'Il tuo turno'; cls = ' need';
       m = {
         open: 'Equipaggia, assumi un ruolo, usa i livelli. Poi apri un ticket: qualcuno deve pur farlo.',
-        after: 'Ticket tranquillo. Puoi cercare guai (tocca una Minaccia in mano), analizzare i log o chiudere il turno.',
+        after: 'Nessuna minaccia: la carta è tua. Puoi cercare guai (tocca una Minaccia in mano), analizzare i log o chiudere il turno.',
         end: 'Chiudi il turno quando hai finito.'
       }[v.phase] || '';
     } else { k = `Turno di ${esc(name(v.cur))}`; m = 'Intanto puoi equipaggiarti. Le Sfighe si giocano in qualsiasi momento.'; }
@@ -445,18 +464,18 @@
     return `${hud(k, m, cls)}<div class="play">${rv}</div>`;
   }
 
-  // Registro: l'ultima riga in alto. Le battute diventano fumetti di chi ha appena agito.
+  // Registro: come una chat, l'ultima riga in basso. Le battute diventano fumetti di chi ha appena agito.
   function logHTML() {
     const v = V(), log = v.log || [];
     const names = v.players.map(p => p.name).sort((a, b) => b.length - a.length);
     const rows = [];
-    log.slice(-40).forEach((r, i, a) => {
+    log.slice(-60).forEach((r, i, a) => {
       if (r.cls !== 'quip') { rows.push(`<li class="l ${esc(r.cls)}">${esc(r.t)}</li>`); return; }
       const prev = (a[i - 1] && a[i - 1].t) || '';
       const who = names.find(n => prev.startsWith(n)) || '';
       rows.push(`<li class="l quip${who && who === ME().name ? ' mine' : ''}"><span class="bubble">${esc(String(r.t).replace(/^«\s*|\s*»$/g, ''))}</span></li>`);
     });
-    return `<h3>Registro</h3><ol class="feed" aria-live="polite">${rows.reverse().join('')}</ol>`;
+    return `${S.logNew ? '<button type="button" class="lognew" data-do="logEnd">Nuovi eventi ↓</button>' : ''}<div class="logwrap"><h3>Registro</h3><ol class="feed" aria-live="polite">${rows.join('')}</ol></div>`;
   }
 
   function meHTML(me) {
@@ -466,7 +485,7 @@
       return `<button type="button" class="slot${g ? ' full' : ''}" data-slot="${s}" aria-label="${SLOTS[s]}${g ? ': ' + esc(g.name) + ', +' + me.gearBonus[s] : ': vuoto'}">${g ? faceHTML(g) + `<span class="sb">+${me.gearBonus[s]}</span>` : ''}<span class="sl">${SLOTS[s]}</span></button>`;
     };
     return `<div class="id" data-seat="${me.seat}">${avaHTML(me)}
-        <div class="who"><div class="on">${esc(me.name)}</div><div class="tt">${esc(me.title)}</div></div>
+        <div class="who"><div class="on">${esc(me.name)}</div><div class="tt">${esc(me.title)}${flags(me)}</div></div>
         <span class="lvl" title="Livello">${me.level}</span></div>
       <div class="stats">
         <span><small>Forza</small><b>${me.power - me.penalty}${me.penalty ? `<em class="r" title="Penalità al prossimo combattimento">policy −${me.penalty}</em>` : ''}</b></span>
@@ -481,8 +500,30 @@
     if (v.over) return false;
     if (!c) return card.type === 'threat' && v.cur === S.you && v.phase === 'after';
     if (card.type === 'oneshot' && card.escape) return c.step === 'flee' && c.fighter === S.you;
-    if (!((c.step === 'prep' && (c.fighter === S.you || c.helper === S.you)) || c.step === 'window')) return false;
+    if (card.type === 'trick') return trickNow(card);
+    if (c.frozen || !((c.step === 'prep' && (c.fighter === S.you || c.helper === S.you)) || c.step === 'window')) return false;
     return card.type === 'oneshot' || card.type === 'boost' || (card.type === 'lateral' && v.hand.some(x => x.type === 'threat'));
+  }
+  // Una carta speciale si può giocare in questo momento del combattimento? (le regole vere le applica il server)
+  function trickNow(card) {
+    const v = V(), c = v.combat, me = S.you;
+    if (!c || v.over) return false;
+    const fighter = c.fighter === me, mine = fighter || c.helper === me;
+    if (card.fx === 'scapegoat') return c.step === 'flee' && fighter;
+    if (card.fx === 'ooo') return false;
+    if (c.frozen || c.step === 'flee') return false;
+    if (card.fx === 'reassign') return c.step === 'prep' && fighter && !c.reassigned && !c.helper && !c.offer;
+    if (!(c.step === 'window' || mine)) return false;
+    const mp = P(c.fighter).level + c.levels >= 10;
+    switch (card.fx) {
+      case 'poach': return !!c.helper && !mine;
+      case 'freeze': return c.step === 'window' && !mp;
+      case 'honeypot': return !!c.lastSab && c.lastSab.by !== me;
+      case 'falsepos': return mine || !mp;
+      case 'oncall': return fighter && !c.helper;
+      case 'ai': case 'reboot': return true;
+    }
+    return false;
   }
   function handHTML() {
     const v = V(), over = v.hand.length > v.handMax && !v.over;
@@ -505,14 +546,15 @@
       }
       if (c.step === 'window') {
         if (passed(me)) return out('Hai passato. Ora guardi e basta, come in ogni post-mortem. Se qualcuno gioca una carta dovrai decidere di nuovo.');
-        if (canAutopass()) return out('Non hai carte da combattimento: passo automatico tra pochi secondi.', B('pass', 'Passo ora', 'primary'));
+        if (canAutopass()) return out(c.frozen ? 'Change freeze: passo automatico tra pochi secondi.' : 'Non hai carte da combattimento: passo automatico tra pochi secondi.', B('pass', 'Passo ora', 'primary'));
+        if (c.frozen) return out('Change freeze: nessuno può più giocare carte o chiedere aiuto. Resta solo da passare.', B('pass', fighter ? (c.winning ? 'Passo: chiudo e vinco' : 'Passo: vado alla fuga') : 'Passo', 'primary'));
         const extra = fighter && c.offer && c.offer.from === me ? B('cancelHelp', 'Annulla richiesta', 'ghost') : canAsk ? B('help', 'Chiedi aiuto') : '';
         const label = fighter ? (c.winning ? 'Passo: chiudo e vinco' : 'Passo: vado alla fuga') : 'Passo';
         const tip = fighter ? (c.winning ? 'Sei in vantaggio. Gli altri possono ancora sabotarti finché non passano tutti.' : 'Sei in svantaggio: gioca carte o chiedi aiuto prima di passare.')
           : c.winning ? `${esc(name(c.fighter))} sta vincendo: tocca una carta per sabotare (+1 Esposizione) oppure passa.` : `${esc(name(c.fighter))} sta perdendo. Puoi passare, o aiutarlo con una carta.`;
         return out(tip, extra + B('pass', label, 'primary'));
       }
-      if (c.step === 'flee' && fighter) return out('Tira il dado e spera che la VPN cada al momento giusto. Se hai un Rollback, toccalo nella mano.', B('flee', 'Tenta la fuga', 'danger'));
+      if (c.step === 'flee' && fighter) return out('Tira il dado e spera che la VPN cada al momento giusto. Se hai un Rollback o un Capro espiatorio, toccalo nella mano.', B('flee', 'Tenta la fuga', 'danger'));
       return out(`${esc(name(c.fighter))} tenta la fuga…`);
     }
     if (v.cur === me) {
@@ -550,7 +592,8 @@
   function canAutopass() {
     const v = V(), c = v && v.combat;
     if (!S.autopass || !c || c.step !== 'window' || passed(S.you) || c.fighter === S.you || c.helper === S.you || (c.offer && c.offer.to === S.you)) return false;
-    return !v.hand.some(k => (k.type === 'oneshot' && !k.escape) || k.type === 'boost' || (k.type === 'lateral' && v.hand.some(t => t.type === 'threat')));
+    if (c.frozen) return true;
+    return !v.hand.some(k => (k.type === 'oneshot' && !k.escape) || k.type === 'boost' || (k.type === 'lateral' && v.hand.some(t => t.type === 'threat')) || (k.type === 'trick' && trickNow(k)));
   }
   function scheduleAutopass() {
     const ok = canAutopass();
@@ -594,7 +637,7 @@
     if (!card || v.over) return [];
     const free = !c; // gestione: sempre, tranne durante un combattimento
     const myTurn = v.cur === S.you && !c;
-    const inFight = !!c && ((c.step === 'prep' && (c.fighter === S.you || c.helper === S.you)) || c.step === 'window');
+    const inFight = !!c && !c.frozen && ((c.step === 'prep' && (c.fighter === S.you || c.helper === S.you)) || c.step === 'window');
     const mine = c && (c.fighter === S.you || c.helper === S.you);
     const B = [];
     const go = a => () => act(a);
@@ -634,11 +677,33 @@
       case 'boost':
         if (inFight) { const sab = card.amt > 0 && !mine; B.push({ label: `Gioca sulla minaccia (${card.amt > 0 ? '+' : ''}${card.amt})${sab ? ' · sabotaggio' : ''}`, cls: sab ? 'danger' : 'primary', on: go({ type: 'play', card: card.uid }) }); }
         break;
+      case 'trick': {
+        const others = v.players.filter(p => p.id !== S.you), T = (extra = {}) => go({ type: 'trick', card: card.uid, ...extra });
+        if (card.fx === 'ooo') { if (!me.ooo) B.push({ label: 'Attiva: la prossima Sfiga torna al mittente', cls: 'primary', on: T() }); }
+        else if (trickNow(card)) {
+          switch (card.fx) {
+            case 'poach': B.push({ label: `Porta via ${name(c.helper)} · sabotaggio`, cls: 'danger', on: T() }); break;
+            case 'freeze': B.push({ label: 'Congela: da ora si può solo passare', cls: 'primary', on: T() }); break;
+            case 'honeypot': B.push({ label: `Annulla «${c.lastSab.name}» di ${name(c.lastSab.by)}`, cls: 'primary', on: T() }); break;
+            case 'falsepos': B.push({ label: mine ? 'Annulla il combattimento: niente premi, niente penalità' : `Annulla il combattimento di ${name(c.fighter)}${c.winning ? ' · sabotaggio' : ''}`, cls: mine || !c.winning ? 'primary' : 'danger', on: T() }); break;
+            case 'reboot': B.push({ label: 'Azzera tutti i bonus e le interferenze', cls: 'primary', on: T() }); break;
+            case 'ai':
+              B.push({ label: mine ? 'Tira il dado per il tuo lato' : `Tira il dado per ${name(c.fighter)}`, cls: mine ? 'primary' : '', on: T({ side: 'f' }) });
+              B.push({ label: `Tira il dado per la minaccia${mine ? '' : ' · sabotaggio'}`, cls: mine ? '' : 'danger', on: T({ side: 'm' }) });
+              break;
+            case 'oncall': others.forEach(p => B.push({ label: `Metti di reperibilità ${p.name} (forza ${p.power})`, cls: 'primary', on: T({ target: p.id }) })); break;
+            case 'scapegoat': others.forEach(p => B.push({ label: `Se ti prendono paga ${p.name} (liv ${p.level}) · sabotaggio`, cls: 'danger', on: T({ target: p.id }) })); break;
+            case 'reassign': others.forEach(p => B.push({ label: `Riassegna a ${p.name} (forza ${p.power - p.penalty}) · sabotaggio`, cls: 'danger', on: T({ target: p.id }) })); break;
+          }
+        }
+        if (free && card.value) B.push({ label: `Vendi per ${card.value} di credito`, on: go({ type: 'sell', card: card.uid }) });
+        break;
+      }
       case 'lateral':
         if (inFight) v.hand.filter(x => x.type === 'threat').forEach(th => B.push({ label: `Aggiungi ${th.name} (forza ${th.l})${mine ? '' : ' · sabotaggio'}`, cls: mine ? '' : 'danger', on: go({ type: 'play', card: card.uid, threat: th.uid }) }));
         break;
     }
-    if (free && !['gear', 'oneshot'].includes(card.type)) B.push({ label: 'Scarta', cls: 'ghost', on: go({ type: 'discard', card: card.uid }) });
+    if (free && !['gear', 'oneshot'].includes(card.type) && !(card.type === 'trick' && card.value)) B.push({ label: 'Scarta', cls: 'ghost', on: go({ type: 'discard', card: card.uid }) });
     return B;
   }
 
@@ -736,6 +801,7 @@
   }
 
   const WIKI = { threat: 'Minacce', curse: 'Sfighe', boost: 'Interferenze', lateral: 'Interferenze', role: 'Ruoli', gear: 'Asset', oneshot: 'Uso singolo', levelup: 'Livello' };
+  const wikiOf = x => (x.type === 'trick' ? (x.deck === 'T' ? 'Interferenze' : 'Uso singolo') : WIKI[x.type]);
   function loadCatalog() {
     if (S.catalog) return;
     S.catalog = [];
@@ -748,7 +814,7 @@
     if (c) return `<button type="button" class="btn" data-m="back">← Tutte le carte</button>
       <h4>${esc(c.name)}</h4><p class="kind">mazzo ${c.deck === 'T' ? 'Ticket' : 'Asset'} · ${c.n} ${pl(c.n, 'copia', 'copie')}</p>${cardDetail(c)}`;
     return `<div class="wiki-f">${[...new Set(Object.values(WIKI))].map(g => `<button type="button" class="btn${g === st.f ? ' primary' : ''}" data-m="f:${g}" aria-pressed="${g === st.f}">${g}</button>`).join('')}</div>
-      <div class="wiki">${all.map((x, i) => WIKI[x.type] !== st.f ? '' : `<button type="button" class="wiki-i" data-m="c:${i}"><span class="face" data-art="${artSlug(x)}"><img src="/cards/${artSlug(x)}.jpg" alt="" loading="lazy"></span><span>${esc(x.name)}</span><small>×${x.n}</small></button>`).join('')}</div>`;
+      <div class="wiki">${all.map((x, i) => wikiOf(x) !== st.f ? '' : `<button type="button" class="wiki-i" data-m="c:${i}"><span class="face" data-art="${artSlug(x)}"><img src="/cards/${artSlug(x)}.jpg" alt="" loading="lazy"></span><span>${esc(x.name)}</span><small>×${x.n}</small></button>`).join('')}</div>`;
   }
   function openRules() {
     const st = S.rulesUi || (S.rulesUi = { tab: 'rules', f: 'Minacce', sel: -1 });
@@ -770,17 +836,18 @@
         <div class="rules">${st.tab === 'wiki' ? wikiHTML(st) : `
         <h4>Obiettivo</h4><p>Arrivare per primi al livello 10, <b>root</b>. L'ultimo livello si ottiene solo neutralizzando una Minaccia: carte livello e credito si fermano al 9.</p>
         <h4>Le carte</h4><ul>
-        <li><b>Mazzo Ticket</b>: Minacce da combattere, Sfighe da giocare sugli altri, Ruoli, Interferenze che potenziano o indeboliscono un combattimento.</li>
-        <li><b>Mazzo Asset</b>: equipaggiamento per i 4 slot, carte a uso singolo e carte livello.</li></ul>
+        <li><b>Mazzo Ticket</b>: Minacce da combattere, Sfighe da giocare sugli altri, Ruoli, Interferenze che cambiano un combattimento (forza in più o in meno, aiutanti portati via, sabotaggi annullati).</li>
+        <li><b>Mazzo Asset</b>: equipaggiamento per i 4 slot, carte a uso singolo (bonus, fughe, scaricabarile) e carte livello.</li></ul>
         <p>Cosa fa ogni carta, con forza, effetti e numero di copie: scheda <b>Wiki carte</b> qui sopra.</p>
         <h4>Il tuo turno</h4><ul>
         <li><b>Dotazione</b>: finché sei a livello 1, a inizio turno peschi un Asset.</li>
-        <li><b>Apri un ticket</b>: carta scoperta. Minaccia: combatti. Sfiga: la subisci. Altro: va in mano.</li>
+        <li><b>Apri un ticket</b>: carta scoperta. Se è una Minaccia la combatti subito. Qualsiasi altra carta, Sfighe comprese, la prendi in mano.</li>
         <li>Se non hai combattuto: <b>cerca guai</b> (affronti una Minaccia dalla mano) o <b>analizza i log</b> (peschi una carta coperta).</li>
         <li><b>Fine turno</b>: massimo 5 carte in mano, scegli tu cosa scartare.</li></ul>
         <h4>Combattimento</h4><p>Forza = livello + asset + carte a uso singolo. Chi combatte si prepara, poi si apre la <b>finestra di interferenza</b>: tutti, compreso chi combatte, devono dichiarare «passo». Ogni carta giocata riapre il giro dei passo, comprese le Sfighe su chi combatte o su chi lo aiuta. Quando tutti hanno passato: se sei in vantaggio vinci livelli e tesori, altrimenti tiri il dado per fuggire (5+, Sysadmin 3+).</p>
         <h4>Aiuto</h4><p>Chi combatte può chiedere aiuto a un avversario offrendo una parte dei tesori. Chi riceve la proposta può accettare, rifiutare o rilanciare con un'altra cifra; a quel punto risponde l'altro, fino a tre controproposte. L'aiutante somma la sua forza, pesca per primo la sua parte e non guadagna livelli.</p>
         <h4>Sabotaggi ed Esposizione</h4><p>Potenziare la Minaccia di un altro, aggiungerne una con Movimento laterale o giocare una Sfiga su qualcuno (in qualsiasi momento) è un <b>sabotaggio</b>: +1 Esposizione. A 4 scatta l'<b>audit del SOC</b>: −1 livello e si riparte da zero. L'Ingegnere sociale non lascia tracce.</p>
+        <h4>Carte speciali</h4><p>Alcune Interferenze e carte a uso singolo hanno una regola propria, scritta sulla scheda: portano via l'aiutante, annullano un sabotaggio, congelano il combattimento, scaricano la penalità su un altro o gli passano l'intero ticket. Quelle giocate contro un altro sono sabotaggi. Alcune penalità fanno <b>saltare il turno</b>: il segnalino resta accanto al nome finché non lo sconti.</p>
         <h4>Asset e credito</h4><p>Uno slot per tipo: Hardware, Software, Credenziali, Gadget. Puoi equipaggiarti, cambiare ruolo e vendere in qualsiasi momento, ma mai durante un combattimento. Vendendo asset accumuli credito: ogni 1000 è +1 livello.</p>
         <h4>Ruoli</h4><ul>${Object.values(ROLES).map(r => `<li><b>${r.name}</b>: ${r.text}</li>`).join('')}</ul>
         <h4>Tempi e disconnessioni</h4><p>Ogni decisione ha un tempo massimo: allo scadere il server passa, chiude il turno o tira la fuga al posto tuo. Se perdi la connessione hai 15 secondi per rientrare, poi le tue mosse diventano automatiche finché non torni.</p>`}</div>`
@@ -803,7 +870,7 @@
       <h5>Il tuo turno</h5>
       <ol class="tsteps">
         <li><span class="tvis">${tcard('gear-hw-laptop-pieno-di-adesivi', 'gear', '+1')}</span><div><b>Preparati</b><p>Equipaggia gli asset, assumi un ruolo, usa le carte livello.</p></div></li>
-        <li><span class="tvis">${tcard('back-ticket', 'back')}</span><div><b>Apri un ticket</b><p>Minaccia: combatti. Sfiga: la subisci. Altro: va in mano.</p></div></li>
+        <li><span class="tvis">${tcard('back-ticket', 'back')}</span><div><b>Apri un ticket</b><p>Minaccia: la combatti subito. Qualsiasi altra carta va in mano.</p></div></li>
         <li><span class="tvis">${tcard('threat-password-su-un-post-it', 'threat', '1')}</span><div><b>Se non combatti</b><p>Cerca guai con una Minaccia dalla tua mano, oppure analizza i log e pesca una carta coperta.</p></div></li>
         <li><span class="tvis tfan">${tcard('curse-reset-password-obbligatorio', 'curse')}${tcard('oneshot-caffe-della-macchinetta', 'oneshot')}${tcard('role-red', 'role')}</span><div><b>Chiudi il turno</b><p>Massimo 5 carte in mano: scegli tu cosa scartare.</p></div></li>
       </ol>`;
@@ -829,11 +896,11 @@
           ${kind(tcard('threat-ransomware-con-assistenza-clienti', 'threat', '11'), 'Minacce', 'Da combattere. Il numero è la loro forza.')}
           ${kind(tcard('curse-reset-password-obbligatorio', 'curse'), 'Sfighe', 'Le giochi sugli altri, quando vuoi.')}
           ${kind(tcard('role-red', 'role'), 'Ruoli', 'Un potere speciale. Uno alla volta.')}
-          ${kind(tcard('boost-zero-day-fresco', 'boost', '+10'), 'Interferenze', 'Forza in più o in meno alla Minaccia.')}
+          ${kind(tcard('boost-zero-day-fresco', 'boost', '+10'), 'Interferenze', 'Cambiano un combattimento: forza alla Minaccia, aiutanti portati via, sabotaggi annullati.')}
         </ul></section>
         <section><div class="tdeck">${tcard('back-asset', 'back')}<h5>Mazzo Asset</h5></div><ul class="tkinds">
           ${kind(tcard('gear-hw-laptop-pieno-di-adesivi', 'gear', '+1'), 'Equipaggiamento', 'Un asset per slot: Hardware, Software, Credenziali, Gadget.')}
-          ${kind(tcard('oneshot-caffe-della-macchinetta', 'oneshot', '+2'), 'Uso singolo', 'Un bonus in combattimento. Il Rollback fa fuggire senza dado.')}
+          ${kind(tcard('oneshot-caffe-della-macchinetta', 'oneshot', '+2'), 'Uso singolo', 'Un bonus o un colpo di mano in combattimento. Il Rollback fa fuggire senza dado.')}
           ${kind(tcard('level-certificazione-appena-presa', 'levelup'), 'Carte livello', '+1 livello, ma non portano a 10.')}
         </ul></section>
       </div>
@@ -907,6 +974,11 @@
   }
 
   /* ================= eventi ================= */
+  // Tornato in fondo al registro a mano: l'avviso «Nuovi eventi» non serve più.
+  document.addEventListener('scroll', e => {
+    const t = e.target;
+    if (S.logNew && t && t.id === 'log' && logGap(t) < 48) { S.logNew = false; render(); }
+  }, true);
   document.addEventListener('input', e => {
     const f = e.target.dataset && e.target.dataset.f;
     if (!f) return;
@@ -966,6 +1038,7 @@
 
   function doAction(d, el) {
     switch (d) {
+      case 'logEnd': { const log = $('#log'); S.logNew = false; if (log) { log._k = null; } return render(); }
       case 'create': if (!S.form.name.trim()) return toast('Scrivi il tuo nome.', 'warn'); return send({ t: 'create', name: S.form.name });
       case 'join':
         if (!S.form.name.trim()) return toast('Scrivi il tuo nome.', 'warn');

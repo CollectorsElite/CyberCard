@@ -88,6 +88,11 @@ wrap('a_play', function (o, p, a) {
   o(p, a);
   if (card) { const self = c && (c.fighter === p.id || c.helper === p.id); inc(S.played, card.name + (card.type === 'oneshot' ? (a.side === 'f' ? ' [pro]' : ' [contro]') : self ? ' [pro]' : ' [contro]')); }
 });
+wrap('a_trick', function (o, p, a) {
+  const card = p.hand.find(x => x.uid === a.card), c = this.combat;
+  o(p, a);
+  if (card) inc(S.played, card.name + (c && (c.fighter === p.id || c.helper === p.id) ? ' [pro]' : c ? ' [contro]' : ''));
+});
 wrap('a_endTurn', function (o, p, a) {
   const ids = Array.isArray(a.discard) ? a.discard : [];
   for (const id of ids) { const c = p.hand.find(x => x.uid === id); if (c) { inc(S.dumped, c.type); inc(S.dumpedCard, c.name); } }

@@ -298,7 +298,7 @@
     "color": "purple",
     "name": "Riorganizzazione aziendale",
     "text": "Il tuo ruolo non esiste più. Nemmeno il tuo ufficio.",
-    "stars": 3
+    "stars": 2
   },
   {
     "slug": "curse-in-copia-su-140-mail",
@@ -350,6 +350,20 @@
     "stars": 2
   },
   {
+    "slug": "curse-shoulder-surfing",
+    "color": "purple",
+    "name": "Shoulder surfing",
+    "text": "In treno, schermo a luminosità massima. Il vicino ringrazia.",
+    "stars": 2
+  },
+  {
+    "slug": "curse-passaggio-di-consegne",
+    "color": "purple",
+    "name": "Passaggio di consegne",
+    "text": "«Ti lascio tutto in ordine.» Un file di testo. Vuoto.",
+    "stars": 2
+  },
+  {
     "slug": "role-red",
     "color": "blue",
     "name": "Red Teamer",
@@ -360,14 +374,14 @@
     "slug": "role-sys",
     "color": "blue",
     "name": "Sysadmin",
-    "text": "La fuga riesce con 4 o più invece che con 5.",
+    "text": "La fuga riesce con 3 o più invece che con 5.",
     "stars": 4
   },
   {
     "slug": "role-blue",
     "color": "blue",
     "name": "Blue Teamer",
-    "text": "La prima Sfiga che ti colpisce in ogni giro viene bloccata.",
+    "text": "La prima Sfiga che un avversario ti gioca in ogni giro viene bloccata.",
     "stars": 4
   },
   {
@@ -397,6 +411,83 @@
     "name": "Versione beta",
     "text": "Si pianta da sola. Più debole, ma rende meno.",
     "stars": 2
+  },
+  {
+    "slug": "boost-priorita-dal-ceo",
+    "color": "gold",
+    "name": "Priorità dal CEO",
+    "text": "Oggetto: «URGENTISSIMO». Testo: «vedi sopra». Sopra non c'è niente.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-hai-un-minuto",
+    "color": "purple",
+    "name": "«Hai un minuto?»",
+    "text": "Non era un minuto. Non lo è mai.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-change-freeze",
+    "color": "purple",
+    "name": "Change freeze",
+    "text": "Fino a lunedì non si tocca niente. Nemmeno quello che è rotto.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-honeypot",
+    "color": "purple",
+    "name": "Honeypot",
+    "text": "Sembrava un server dimenticato. Aveva i log accesi.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-falso-positivo",
+    "color": "purple",
+    "name": "Falso positivo",
+    "text": "Il SOC chiude il ticket: non era niente. Forse.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-turno-di-reperibilita",
+    "color": "blue",
+    "name": "Turno di reperibilità",
+    "text": "Era nel contratto. Pagina 14, corpo 6.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-capro-espiatorio",
+    "color": "blue",
+    "name": "Capro espiatorio",
+    "text": "Nel post-mortem c'è un solo nome. Non è il tuo.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-risposta-automatica",
+    "color": "blue",
+    "name": "Risposta automatica",
+    "text": "«Sono fuori ufficio. Per urgenze, rivolgersi al mittente.»",
+    "stars": 3
+  },
+  {
+    "slug": "trick-chiedo-all-ia",
+    "color": "blue",
+    "name": "Chiedo all'IA",
+    "text": "Risponde subito e con grande sicurezza. È questo che preoccupa.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-spegni-e-riaccendi",
+    "color": "blue",
+    "name": "Spegni e riaccendi",
+    "text": "Il rimedio più antico del mestiere. Funziona ancora.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-riassegnazione-del-ticket",
+    "color": "blue",
+    "name": "Riassegnazione del ticket",
+    "text": "«Non è di mia competenza.» Ora è della tua.",
+    "stars": 3
   },
   {
     "slug": "lateral-movimento",
@@ -507,7 +598,7 @@
     "slug": "gear-gd-felpa-col-cappuccio-d-ordinanza",
     "color": "gold",
     "name": "Felpa col cappuccio d'ordinanza",
-    "text": "Per un Red Teamer vale +2 in più.",
+    "text": "Il cappuccio si alza quando parte lo scan.",
     "stars": 1
   },
   {

@@ -17,8 +17,15 @@ const missing = [...new Set([...T, ...A].map(artSlug))].filter(s => !fs.existsSy
 assert.deepStrictEqual(missing, [], 'illustrazioni mancanti: ' + missing.join(', '));
 
 // Battute dei fumetti: ogni carta da sabotaggio e ogni effetto di minaccia ha la sua.
-const keys = [...T, ...A].flatMap(c => c.type === 'threat' ? ['fleeKo:' + (c.bad[0].s || c.bad[0].k)]
-  : (c.type === 'oneshot' && !c.escape) || c.type === 'lateral' || (c.type === 'boost' && c.amt > 0) ? ['sabotage:' + c.name] : []);
+const keys = [...T, ...A].flatMap(c => c.type === 'threat' ? ['fleeKo:' + (c.bad[0].k === 'slot' ? c.bad[0].s : c.bad[0].k)]
+  : (c.type === 'oneshot' && !c.escape) || c.type === 'lateral' || (c.type === 'boost' && c.amt > 0) ? ['sabotage:' + c.name]
+    : c.type === 'trick' ? ['trick:' + c.fx] : []);
+// Ogni carta speciale ha la sua regola nel motore e il suo testo; ogni penalità ha il suo testo.
+const { Game } = require('../server/game');
+for (const c of [...T, ...A]) {
+  if (c.type === 'trick') assert(typeof Game.prototype['t_' + c.fx] === 'function' && c.text, 'carta speciale senza regola o testo: ' + c.name);
+  if (c.bad) assert(c.bt && !c.bt.split(', ').includes(''), 'penalità senza testo: ' + c.name);
+}
 const noQuip = [...new Set(keys)].filter(k => !QUIPS[k]);
 assert.deepStrictEqual(noQuip, [], 'battute mancanti: ' + noQuip.join(', '));
 for (const q of Object.values(QUIPS).flat()) assert(!/^«|»$/.test(q), 'il fumetto taglierebbe le virgolette: ' + q);

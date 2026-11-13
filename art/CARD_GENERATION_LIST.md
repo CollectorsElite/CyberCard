@@ -15,7 +15,27 @@ Template visuale (foto ref): cornice nera · area immagine comics in alto · 1�
 **Formato riga:** `slug` · stelle · **Nome** · testo UI · *brief comics*
 
 Totale **~82 asset unici** da generare (le copie in mazzo riusano la stessa arte).
-Mazzo fisico target 6p: **T ~85 / A ~65** (vedi `server/cards.js`).
+Mazzo attuale: **T 83 / A 81** (vedi `server/cards.js`).
+
+### Nuove carte (v3 mazzo) — illustrazioni PROVVISORIE da sostituire
+
+Queste 13 carte hanno un'illustrazione provvisoria composta in automatico: stesso telaio delle altre (cornice nera, stelle, barra del nome, riquadro del testo), ma al posto del disegno a fumetti ci sono pittogrammi [OpenMoji](https://openmoji.org) (licenza CC BY-SA 4.0). Per la versione definitiva basta generare l'immagine con il prompt base in fondo a questo file e salvarla in `art/cards/<slug>.jpg` con lo stesso nome, poi rilanciare `python3 art/build-frames.py`.
+
+| slug | colore | ★ | Nome | Testo sulla carta | Brief per il disegno |
+|------|--------|---|------|-------------------|----------------------|
+| `trick-hai-un-minuto` | viola | 3 | «Hai un minuto?» | Non era un minuto. Non lo è mai. | Collega che si affaccia alla scrivania con il dito alzato, l'altro guarda disperato l'orologio. |
+| `trick-change-freeze` | viola | 3 | Change freeze | Fino a lunedì non si tocca niente. Nemmeno quello che è rotto. | Sala server dentro un blocco di ghiaccio, cartello «NON TOCCARE», tecnico con le mani alzate. |
+| `trick-honeypot` | viola | 3 | Honeypot | Sembrava un server dimenticato. Aveva i log accesi. | Vasetto di miele a forma di server, attaccante con la mano incollata dentro, telecamera che riprende. |
+| `trick-falso-positivo` | viola | 3 | Falso positivo | Il SOC chiude il ticket: non era niente. Forse. | Analista che spegne una sirena con un timbro «CHIUSO», dietro di lui qualcosa fuma. |
+| `boost-priorita-dal-ceo` | oro | 3 | Priorità dal CEO | Oggetto: «URGENTISSIMO». Testo: «vedi sopra». Sopra non c'è niente. | Mail gigante con corona e punto esclamativo rosso che piomba su una scrivania. |
+| `curse-shoulder-surfing` | viola | 2 | Shoulder surfing | In treno, schermo a luminosità massima. Il vicino ringrazia. | Treno, portatile luminosissimo, vicino di posto che prende appunti. |
+| `curse-passaggio-di-consegne` | viola | 3 | Passaggio di consegne | «Ti lascio tutto in ordine.» Un file di testo. Vuoto. | Collega che scappa con lo scatolone lasciando un post-it «in bocca al lupo» su una scrivania in fiamme. |
+| `trick-turno-di-reperibilita` | blu | 3 | Turno di reperibilità | Era nel contratto. Pagina 14, corpo 6. | Tecnico in pigiama svegliato alle 3 da un cercapersone che vibra sul comodino. |
+| `trick-capro-espiatorio` | blu | 3 | Capro espiatorio | Nel post-mortem c'è un solo nome. Non è il tuo. | Riunione di post-mortem, tutti indicano una capra con il badge da stagista. |
+| `trick-risposta-automatica` | blu | 3 | Risposta automatica | «Sono fuori ufficio. Per urgenze, rivolgersi al mittente.» | Sdraio in spiaggia, portatile chiuso, buste che rimbalzano indietro contro un ombrellone. |
+| `trick-chiedo-all-ia` | blu | 3 | Chiedo all'IA | Risponde subito e con grande sicurezza. È questo che preoccupa. | Robot sorridente che porge un dado a un tecnico perplesso, fumetto con una risposta lunghissima. |
+| `trick-spegni-e-riaccendi` | blu | 3 | Spegni e riaccendi | Il rimedio più antico del mestiere. Funziona ancora. | Mano che stacca la spina di un intero datacenter, tutti trattengono il fiato. |
+| `trick-riassegnazione-del-ticket` | blu | 3 | Riassegnazione del ticket | «Non è di mia competenza.» Ora è della tua. | Ticket in fiamme passato come una patata bollente da una scrivania all'altra. |
 
 ### Nuove carte (v2 mazzo) — da aggiungere in coda ai batch
 

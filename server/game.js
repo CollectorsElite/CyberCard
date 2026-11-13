@@ -3,10 +3,11 @@
 // il server le valida contro lo stato e manda a ciascuno solo ciò che può vedere.
 
 const crypto = require('crypto');
-const { TITLES, SLOTS, ROLES, QUIPS, buildDecks } = require('./cards');
+const { TITLES, SLOTS, ROLES, QUIPS, buildDecks, badText } = require('./cards');
 
 const HAND_MAX = 5, ESP_MAX = 4, WIN_LEVEL = 10;
 const HELP_COUNTERS = 3; // controproposte ammesse in una trattativa di aiuto, poi si può solo accettare o rifiutare
+const FROZEN = 'Change freeze: in questo combattimento non si gioca più niente. Si può solo passare.';
 const DEFAULT_TIMEOUTS = { turn: 90000, prep: 60000, window: 45000, offer: 25000, flee: 30000 };
 
 class GameError extends Error {}
@@ -26,7 +27,7 @@ class Game {
     this.disc = { T: [], A: [] };
     this.players = players.map((p, i) => ({
       id: p.id, name: p.name, isBot: !!p.isBot, seat: i, level: 1, esp: 0, credit: 0, penalty: 0,
-      role: null, gear: { hw: null, sw: null, cr: null, gd: null }, hand: [], blueUsed: false
+      role: null, gear: { hw: null, sw: null, cr: null, gd: null }, hand: [], blueUsed: false, skip: false, ooo: false
     }));
     this.id = crypto.randomBytes(4).toString('hex');
     this.logs = []; this.fxs = []; this.seq = 0; this.version = 0; this.quipBag = {}; this.quipLast = {};
@@ -85,7 +86,7 @@ class Game {
   cThreatPower(c = this.combat) { const f = this.fighter(c); return c.threats.reduce((s, t) => s + t.card.l + t.mod + this.vsBonus(t.card, f), 0) + c.mBonus; }
   cWinning(c = this.combat) { const a = this.cFighterPower(c), b = this.cThreatPower(c); return a > b || (a === b && this.isRole(this.fighter(c), 'red')); }
   cTreasures(c = this.combat) { return Math.max(0, c.threats.reduce((s, t) => s + t.card.tr + t.trMod, 0)); }
-  cLevels(c = this.combat) { return c.threats.reduce((s, t) => s + t.card.lv, 0); }
+  cLevels(c = this.combat) { return c.threats.reduce((s, t) => s + t.card.lv + (t.lvMod || 0), 0); }
   threatNames(c = this.combat) { return c.threats.map(t => t.card.name).join(' + '); }
 
   /* ---------- chi deve agire ---------- */
@@ -130,7 +131,7 @@ class Game {
   /* ---------- turno ---------- */
   startTurn() {
     this.phase = 'open'; this.revealed = null;
-    const p = this.current; p.blueUsed = false;
+    const p = this.current; p.blueUsed = false; p.ooo = false; // la Risposta automatica dura fino al proprio turno
     this.log(`Turno di ${p.name}.`, 'turn');
     // Dotazione: chi è a livello 1 riceve un Asset a inizio turno. Gli Asset si vincono solo in combattimento,
     // quindi senza questo chi resta senza equipaggiamento non ha modo di rialzarsi.
@@ -146,11 +147,12 @@ class Game {
     const card = this.draw('T');
     if (!card) { this.phase = 'after'; this.setDeadline(this.to.turn); this.log('Mazzo Ticket esaurito.', 'sys'); return; }
     this.log(`${p.name} apre un ticket: ${card.name}.`);
-    if (card.d && (card.type === 'threat' || card.type === 'curse')) this.log(`«${card.d}»`, 'quip');
     this.revealed = { card, by: p.id };
-    if (card.type === 'threat') return this.startCombat(p, [card]);
-    if (card.type === 'curse') this.applyCurse(p, card, null);
-    else { p.hand.push(card); this.fx({ kind: 'kept', to: p.id, card: card.name }); }
+    if (card.type === 'threat') { if (card.d) this.log(`«${card.d}»`, 'quip'); return this.startCombat(p, [card]); }
+    // Solo le Minacce si affrontano subito: tutto il resto, Sfighe comprese, va in mano a chi ha aperto il ticket.
+    p.hand.push(card);
+    this.log(`Nessuna minaccia: ${p.name} si tiene la carta.`, 'sys');
+    this.fx({ kind: 'kept', to: p.id, card: card.name });
     this.phase = 'after'; this.setDeadline(this.to.turn);
   }
   a_trouble(p, a) {
@@ -181,8 +183,19 @@ class Game {
       cards.forEach(c => { this.removeFromHand(p, c); this.discard(c); });
       this.log(`${p.name} scarta ${excess} ${pl(excess, 'carta', 'carte')} per il limite di mano.`, 'sys');
     }
-    this.cur = (this.cur + 1) % this.players.length;
-    if (this.cur === this.startSeat) this.turn++;
+    this.advance();
+  }
+  // Passa al prossimo giocatore. Chi deve saltare il turno lo salta qui, e il segnalino si consuma.
+  advance() {
+    for (let k = 0; k < this.players.length; k++) {
+      this.cur = (this.cur + 1) % this.players.length;
+      if (this.cur === this.startSeat) this.turn++;
+      const n = this.current;
+      if (!n.skip) break;
+      n.skip = false; n.ooo = false;
+      this.log(`${n.name} salta il turno.`, 'bad');
+      this.fx({ kind: 'skip', pid: n.id, quip: this.say('skipped') });
+    }
     this.startTurn();
   }
 
@@ -242,6 +255,8 @@ class Game {
     const card = this.handCard(p, a.card, 'curse');
     const t = this.p(a.target);
     if (t === p) fail('Non puoi giocare una Sfiga su te stesso.');
+    const k = this.combat;
+    if (k && k.frozen && (t.id === k.fighter || t.id === k.helper)) fail(FROZEN);
     this.removeFromHand(p, card);
     this.applyCurse(t, card, p);
     // una Sfiga su chi combatte o su chi aiuta cambia le forze: come ogni altra carta, riapre il giro dei «passo»
@@ -252,8 +267,9 @@ class Game {
   /* ---------- combattimento ---------- */
   startCombat(f, cards) {
     this.combat = {
-      fighter: f.id, threats: cards.map(card => ({ card, mod: 0, trMod: 0 })), fBonus: 0, mBonus: 0,
-      helper: null, share: 0, ev: [], step: 'prep', passes: new Set(), offer: null, offerDeadline: 0, asked: [], mood: {}
+      fighter: f.id, threats: cards.map(card => ({ card, mod: 0, trMod: 0, lvMod: 0 })), fBonus: 0, mBonus: 0,
+      helper: null, share: 0, ev: [], step: 'prep', passes: new Set(), offer: null, offerDeadline: 0, asked: [], mood: {},
+      frozen: false, lastSab: null, reassigned: false
     };
     this.phase = 'combat'; this.revealed = null;
     this.log(`${f.name} affronta ${this.threatNames()} (forza ${this.cThreatPower()}).`, 'fight');
@@ -269,8 +285,7 @@ class Game {
     this.fx({ kind: 'window' });
   }
   a_play(p, a) {
-    const c = this.inCombat(['prep', 'window']);
-    if (c.step === 'prep' && p.id !== c.fighter && p.id !== c.helper) fail('Gli altri possono interferire solo quando la finestra è aperta.');
+    const c = this.combatPlay(p);
     const card = this.handCard(p, a.card, ['oneshot', 'boost', 'lateral']);
     const f = this.fighter(c), sabot = p !== f && p.id !== c.helper;
     let txt;
@@ -280,28 +295,175 @@ class Game {
       if (a.side === 'f') c.fBonus += card.bonus; else c.mBonus += card.bonus;
       txt = `${p.name}: ${card.name} (+${card.bonus} ${a.side === 'f' ? 'a ' + f.name : 'alla minaccia'})`;
       this.removeFromHand(p, card); this.discard(card);
-      if (a.side === 'm' && sabot) this.sabotage(p, txt, card); else this.cEv(c, txt);
+      if (a.side === 'm' && sabot) this.sabotage(p, txt, card, () => { c.mBonus -= card.bonus; }); else this.cEv(c, txt);
     } else if (card.type === 'boost') {
-      const t = c.threats[c.threats.length - 1];
-      t.mod += card.amt; t.trMod += card.tr;
-      txt = `${p.name}: ${card.name} (${card.amt > 0 ? '+' : ''}${card.amt} alla minaccia)`;
+      const t = c.threats[c.threats.length - 1], lv = card.lv || 0;
+      t.mod += card.amt; t.trMod += card.tr; t.lvMod += lv;
+      txt = `${p.name}: ${card.name} (${card.amt > 0 ? '+' : ''}${card.amt} alla minaccia${lv ? `, +${lv} ${pl(lv, 'livello', 'livelli')} in palio` : ''})`;
       this.removeFromHand(p, card); this.discard(card);
-      if (card.amt > 0 && sabot) this.sabotage(p, txt, card); else this.cEv(c, txt);
+      if (card.amt > 0 && sabot) this.sabotage(p, txt, card, () => { t.mod -= card.amt; t.trMod -= card.tr; t.lvMod -= lv; }); else this.cEv(c, txt);
     } else {
       const th = this.handCard(p, a.threat, 'threat');
       this.removeFromHand(p, card); this.removeFromHand(p, th); this.discard(card);
-      c.threats.push({ card: th, mod: 0, trMod: 0 });
+      c.threats.push({ card: th, mod: 0, trMod: 0, lvMod: 0 });
       txt = `${p.name}: Movimento laterale, entra ${th.name} (forza ${th.l}). «${th.d}»`;
-      if (sabot) this.sabotage(p, txt, card); else this.cEv(c, txt);
+      if (sabot) this.sabotage(p, txt, card, () => { const i = c.threats.findIndex(x => x.card === th); if (i > 0) { c.threats.splice(i, 1); this.discard(th); } });
+      else this.cEv(c, txt);
     }
     this.touch(c);
   }
   cEv(c, txt, cls = '') { c.ev.push(txt); this.log(txt, cls); }
-  sabotage(p, txt, card) {
-    this.cEv(this.combat, txt, 'sab');
-    const q = this.say('sabotage', card.name);
-    this.fx({ kind: 'sabotage', by: p.id, target: this.combat.fighter, text: txt, quip: q });
+  // `undo` rimette le cose com'erano: serve all'Honeypot, che annulla l'ultimo sabotaggio.
+  sabotage(p, txt, card, undo = null) {
+    const c = this.combat;
+    this.cEv(c, txt, 'sab');
+    const q = card.type === 'trick' ? this.say('trick', card.fx) : this.say('sabotage', card.name);
+    this.fx({ kind: 'sabotage', by: p.id, target: c.fighter, text: txt, quip: q });
+    c.lastSab = undo ? { by: p.id, name: card.name, undo } : null;
     this.addEsp(p);
+  }
+  // Chi può giocare una carta in combattimento adesso: chi combatte e chi aiuta sempre, gli altri solo a finestra aperta.
+  combatPlay(p) {
+    const c = this.inCombat(['prep', 'window']);
+    if (c.frozen) fail(FROZEN);
+    if (c.step === 'prep' && p.id !== c.fighter && p.id !== c.helper) fail('Gli altri possono interferire solo quando la finestra è aperta.');
+    return c;
+  }
+  outsider(p, c = this.combat) { return p.id !== c.fighter && p.id !== c.helper; }
+  spend(p, card) { this.removeFromHand(p, card); this.discard(card); }
+  // La prima mossa ostile su chi è «fuori ufficio» o su un Blue Teamer con lo scudo pronto non passa.
+  shielded(t, by, what) {
+    if (t.ooo) {
+      t.ooo = false;
+      this.log(`${t.name} è fuori ufficio: ${what} torna a ${by.name}.`, 'good');
+      this.say('bounce');
+      return 'ooo';
+    }
+    if (this.isRole(t, 'blue') && !t.blueUsed) {
+      t.blueUsed = true;
+      this.log(`${t.name} (Blue Teamer) blocca ${what}.`, 'good');
+      this.say('block');
+      return 'blue';
+    }
+    return '';
+  }
+
+  /* ---------- carte speciali ---------- */
+  a_trick(p, a) {
+    const card = this.handCard(p, a.card, 'trick');
+    const fn = this['t_' + card.fx];
+    if (typeof fn !== 'function') fail('Carta non giocabile.');
+    fn.call(this, p, card, a);
+  }
+  target(p, a) { const t = this.p(a.target); if (t === p) fail('Scegli un altro giocatore.'); return t; }
+  t_poach(p, card) {
+    const c = this.combatPlay(p);
+    if (!c.helper) fail('Non c\'è nessun aiutante da portare via.');
+    if (!this.outsider(p, c)) fail('Si gioca sul combattimento di un altro.');
+    const h = this.helper(c), share = c.share;
+    c.helper = null; c.share = 0;
+    this.spend(p, card);
+    this.sabotage(p, `${p.name}: ${card.name} porta via ${h.name} dal combattimento`, card, () => { if (!c.helper) { c.helper = h.id; c.share = share; } });
+    this.touch(c);
+  }
+  t_freeze(p, card) {
+    const c = this.combatPlay(p);
+    if (c.step !== 'window') fail('Il Change freeze si gioca a finestra aperta.');
+    if (this.fighter(c).level + this.cLevels(c) >= WIN_LEVEL) fail('Quando c\'è di mezzo root nessun change freeze regge.');
+    c.frozen = true; c.offer = null;
+    this.spend(p, card);
+    this.cEv(c, `${p.name}: Change freeze. Da ora nessuno gioca più carte in questo combattimento`, 'sys');
+    this.fx({ kind: 'freeze', by: p.id, quip: this.say('trick', 'freeze') });
+    this.touch(c);
+  }
+  t_honeypot(p, card) {
+    const c = this.combatPlay(p), s = c.lastSab;
+    if (!s) fail('Non c\'è nessun sabotaggio da annullare.');
+    if (s.by === p.id) fail('Non puoi annullare un tuo sabotaggio.');
+    c.lastSab = null; s.undo();
+    this.spend(p, card);
+    const by = this.p(s.by);
+    this.cEv(c, `${p.name}: Honeypot, annullato «${s.name}» di ${by.name}`, 'good');
+    this.fx({ kind: 'honeypot', by: p.id, target: by.id, card: s.name, quip: this.say('trick', 'honeypot') });
+    this.addEsp(by);
+    this.touch(c);
+  }
+  t_falsepos(p, card) {
+    const c = this.combatPlay(p), f = this.fighter(c);
+    if (this.outsider(p, c) && f.level + this.cLevels(c) >= WIN_LEVEL) fail('Chi sta per prendere root non si ferma con un falso positivo: servono carte vere.');
+    const txt = `${p.name}: Falso positivo. Il combattimento contro ${this.threatNames(c)} è annullato: nessun premio, nessuna penalità`;
+    this.spend(p, card);
+    if (this.outsider(p, c) && this.cWinning(c)) this.sabotage(p, txt, card);
+    else { this.cEv(c, txt); this.fx({ kind: 'falsepos', by: p.id, target: f.id, quip: this.say('trick', 'falsepos') }); }
+    this.endCombat();
+  }
+  t_oncall(p, card, a) {
+    const c = this.combatPlay(p);
+    if (c.fighter !== p.id) fail('La giochi quando sei tu a combattere.');
+    if (c.helper) fail('Hai già un aiutante.');
+    const t = this.target(p, a);
+    c.offer = null; c.helper = t.id; c.share = 0;
+    this.spend(p, card);
+    this.cEv(c, `${p.name}: Turno di reperibilità, ${t.name} aiuta gratis (+${this.basePower(t)})`, 'good');
+    this.fx({ kind: 'oncall', by: p.id, target: t.id, quip: this.say('trick', 'oncall') });
+    this.touch(c);
+  }
+  t_scapegoat(p, card, a) {
+    const c = this.inCombat(['flee']);
+    if (c.fighter !== p.id) fail('La giochi quando sei tu a dover fuggire.');
+    const t = this.target(p, a);
+    this.spend(p, card);
+    this.log(`${p.name} indica ${t.name} come capro espiatorio.`, 'sab');
+    this.say('trick', 'scapegoat');
+    this.fx({ kind: 'scapegoat', by: p.id, target: t.id });
+    this.addEsp(p);
+    this.flee(p, c, this.shielded(t, p, 'lo scaricabarile') ? p : t);
+  }
+  t_ooo(p, card) {
+    if (p.ooo) fail('La Risposta automatica è già attiva.');
+    p.ooo = true;
+    this.spend(p, card);
+    this.log(`${p.name} attiva la Risposta automatica: la prossima Sfiga torna al mittente.`);
+    this.say('trick', 'ooo');
+  }
+  t_ai(p, card, a) {
+    const c = this.combatPlay(p), f = this.fighter(c);
+    if (a.side !== 'f' && a.side !== 'm') fail('Scegli a chi dare il risultato.');
+    const roll = 1 + this.rng(6), amt = roll === 1 ? -3 : roll === 6 ? 8 : roll, sabot = this.outsider(p, c) && a.side === 'm';
+    if (a.side === 'f') c.fBonus += amt; else c.mBonus += amt;
+    this.spend(p, card);
+    const txt = `${p.name}: Chiedo all'IA, dado ${roll}: ${amt > 0 ? '+' : '−'}${Math.abs(amt)} ${a.side === 'f' ? 'a ' + f.name : 'alla minaccia'}`;
+    this.fx({ kind: 'ai', by: p.id, roll, amt, side: a.side });
+    if (sabot && amt > 0) this.sabotage(p, txt, card, () => { c.mBonus -= amt; });
+    else { this.cEv(c, txt, sabot ? 'sab' : ''); this.say('trick', amt < 0 ? 'aiKo' : 'ai'); if (sabot) this.addEsp(p); }
+    this.touch(c);
+  }
+  t_reboot(p, card) {
+    const c = this.combatPlay(p), was = this.cWinning(c);
+    c.fBonus = 0; c.mBonus = 0; c.lastSab = null;
+    c.threats.forEach(t => { t.mod = 0; t.trMod = 0; t.lvMod = 0; });
+    this.spend(p, card);
+    const txt = `${p.name}: Spegni e riaccendi. Azzerati tutti i bonus e le interferenze`;
+    if (this.outsider(p, c) && was && !this.cWinning(c)) this.sabotage(p, txt, card);
+    else { this.cEv(c, txt); this.fx({ kind: 'reboot', by: p.id, quip: this.say('trick', 'reboot') }); }
+    this.touch(c);
+  }
+  t_reassign(p, card, a) {
+    const c = this.inCombat(['prep']);
+    if (c.fighter !== p.id) fail('La giochi quando sei tu a combattere.');
+    if (c.reassigned) fail('Questo ticket è già stato riassegnato una volta.');
+    if (c.helper || c.offer) fail('Prima chiudi la questione dell\'aiuto.');
+    const t = this.target(p, a);
+    this.spend(p, card);
+    this.log(`${p.name} riassegna il ticket a ${t.name}.`, 'sab');
+    this.say('trick', 'reassign');
+    this.addEsp(p);
+    c.reassigned = true;
+    if (this.shielded(t, p, 'il ticket')) { this.setDeadline(this.to.prep); return; }
+    c.fighter = t.id; c.fBonus = 0; c.asked = []; c.mood = {}; c.passes.clear(); c.lastSab = null;
+    this.log(`${t.name} eredita il ticket: affronta ${this.threatNames(c)} (forza ${this.cThreatPower(c)}).`, 'fight');
+    this.fx({ kind: 'reassign', by: p.id, target: t.id, threat: this.threatNames(c) });
+    this.setDeadline(this.to.prep);
   }
   a_pass(p) {
     const c = this.inCombat(['window']);
@@ -314,6 +476,7 @@ class Game {
   a_askHelp(p, a) {
     const c = this.inCombat(['prep', 'window']);
     if (c.fighter !== p.id) fail('Solo chi combatte può chiedere aiuto.');
+    if (c.frozen) fail(FROZEN);
     if (c.helper) fail('Hai già un aiutante.');
     if (c.offer) fail('C\'è già una richiesta in sospeso.');
     const to = this.p(a.to);
@@ -377,13 +540,17 @@ class Game {
   a_flee(p) {
     const c = this.inCombat(['flee']);
     if (c.fighter !== p.id) fail('Non sei tu a combattere.');
+    this.flee(p, c, p);
+  }
+  // Un tiro per minaccia. Con il Capro espiatorio la penalità di chi viene preso la paga `victim`.
+  flee(p, c, victim) {
     for (const t of c.threats) {
       const need = Math.min(6, Math.max(2, (this.isRole(p, 'sys') ? 3 : 5) - t.card.flee));
-      const roll = 1 + this.rng(6), ok = roll >= need;
-      this.log(`${p.name} tenta la fuga da ${t.card.name}: ${roll} (serve ${need}+), ${ok ? 'scappa' : 'preso'}.`, ok ? '' : 'bad');
-      const q = this.say(ok ? 'fleeOk' : 'fleeKo', t.card.bad[0].s || t.card.bad[0].k);
-      this.fx({ kind: 'roll', pid: p.id, threat: t.card.name, roll, need, ok, bad: ok ? '' : this.badText(t.card.bad), quip: q });
-      if (!ok) this.applyBad(p, t.card.bad);
+      const roll = 1 + this.rng(6), ok = roll >= need, scape = victim !== p;
+      this.log(`${p.name} tenta la fuga da ${t.card.name}: ${roll} (serve ${need}+), ${ok ? 'scappa' : scape ? `preso, ma paga ${victim.name}` : 'preso'}.`, ok ? '' : 'bad');
+      const q = !ok && scape ? '' : this.say(ok ? 'fleeOk' : 'fleeKo', t.card.bad[0].s && t.card.bad[0].k === 'slot' ? t.card.bad[0].s : t.card.bad[0].k);
+      this.fx({ kind: 'roll', pid: p.id, threat: t.card.name, roll, need, ok, bad: ok ? '' : this.badText(t.card.bad), quip: q, victim: scape ? victim.id : null });
+      if (!ok) this.applyBad(victim, t.card.bad);
     }
     this.endCombat();
   }
@@ -425,30 +592,42 @@ class Game {
   }
 
   /* ---------- effetti ---------- */
-  badText(effects) {
-    return effects.map(e => {
-      switch (e.k) {
-        case 'lvl': return `perdi ${e.n} ${pl(e.n, 'livello', 'livelli')}`;
-        case 'slot': return `perdi l'asset ${SLOTS[e.s]}`;
-        case 'hand': return e.n >= 99 ? 'scarti tutta la mano' : `scarti ${e.n} ${pl(e.n, 'carta', 'carte')} a caso`;
-        case 'gearAll': return 'perdi tutto l\'equipaggiamento';
-        case 'role': return 'perdi il ruolo';
-        case 'best': return 'perdi l\'asset con il bonus più alto';
-        case 'penalty': return `−${e.n} al prossimo combattimento`;
-        case 'wipe': return 'perdi equipaggiamento, ruolo e mano';
-      }
-      return '';
-    }).join(', ');
+  badText(effects) { return badText(effects); }
+  randomOther(p) { const o = this.players.filter(x => x !== p); return o[this.rng(o.length)]; }
+  bestGear(p) { return this.gearOf(p).sort((a, b) => this.gBonus(p, b) - this.gBonus(p, a))[0] || null; }
+  // sposta n carte a caso dalla mano di `from` a quella di `to`; ritorna quante ne ha spostate
+  moveCards(from, to, n) {
+    const got = [];
+    for (let i = 0; i < n && from.hand.length; i++) got.push(from.hand.splice(this.rng(from.hand.length), 1)[0]);
+    to.hand.push(...got);
+    if (got.length) this.fx({ kind: 'drawn', to: to.id, cards: got.map(c => c.name) });
+    return got.length;
   }
-  applyBad(p, effects) {
+  // `by` è chi ha giocato la carta (solo per le Sfighe): serve agli effetti che coinvolgono il mittente.
+  applyBad(p, effects, by = null) {
     for (const e of effects) {
       switch (e.k) {
+        case 'skip': if (!p.skip) { p.skip = true; this.log(`${p.name} salterà il prossimo turno.`, 'bad'); } break;
+        case 'esp': this.log(`${p.name}: +${e.n} Esposizione.`, 'bad'); for (let i = 0; i < e.n; i++) this.addEsp(p, true); break;
+        case 'credit': if (p.credit) { this.log(`${p.name} perde ${p.credit} di credito.`, 'bad'); p.credit = 0; } break;
+        case 'robbed': { const o = this.randomOther(p), n = this.moveCards(p, o, e.n); if (n) this.log(`${o.name} prende ${n} ${pl(n, 'carta', 'carte')} dalla mano di ${p.name}.`, 'bad'); break; }
+        case 'give': {
+          const gs = this.gearOf(p), g = e.s === 'best' ? this.bestGear(p) : e.s ? p.gear[e.s] : gs[this.rng(gs.length || 1)];
+          if (g) { const o = this.randomOther(p); p.gear[g.slot] = null; o.hand.push(g); this.log(`${g.name} passa da ${p.name} a ${o.name}.`, 'bad'); this.fx({ kind: 'drawn', to: o.id, cards: [g.name] }); }
+          break;
+        }
+        case 'all': this.log(`Tutti scartano ${e.n} ${pl(e.n, 'carta', 'carte')}.`, 'bad'); for (const q of this.players) for (let i = 0; i < e.n && q.hand.length; i++) this.discard(q.hand.splice(this.rng(q.hand.length), 1)[0]); break;
+        case 'swapHand': { const o = this.randomOther(p); [p.hand, o.hand] = [o.hand, p.hand]; this.log(`${p.name} e ${o.name} si scambiano la mano.`, 'bad'); this.fx({ kind: 'swap', a: p.id, b: o.id }); break; }
+        case 'unequip': { const g = this.bestGear(p); if (g) { p.gear[g.slot] = null; p.hand.push(g); this.log(`${p.name} deve rimettere in mano ${g.name}.`, 'bad'); } break; }
+        case 'steal': if (by) { const n = this.moveCards(p, by, e.n); if (n) this.log(`${by.name} prende ${n} ${pl(n, 'carta', 'carte')} dalla mano di ${p.name}.`, 'bad'); } break;
+        case 'swapRole': if (by && (p.role || by.role)) { [p.role, by.role] = [by.role, p.role]; this.log(`${p.name} e ${by.name} si scambiano il ruolo.`, 'bad'); } break;
+        case 'handover': if (by) { [p.hand, by.hand] = [by.hand, p.hand]; this.log(`${p.name} e ${by.name} si scambiano la mano.`, 'bad'); this.fx({ kind: 'swap', a: p.id, b: by.id }); } break;
         case 'lvl': { const b = p.level; p.level = Math.max(1, p.level - e.n); if (b > p.level) this.log(`${p.name} perde ${b - p.level} ${pl(b - p.level, 'livello', 'livelli')}.`, 'bad'); break; }
         case 'slot': { const g = p.gear[e.s]; if (g) { p.gear[e.s] = null; this.discard(g); this.log(`${p.name} perde ${g.name}.`, 'bad'); } break; }
         case 'hand': { const n = Math.min(e.n, p.hand.length); for (let i = 0; i < n; i++) this.discard(p.hand.splice(this.rng(p.hand.length), 1)[0]); if (n) this.log(`${p.name} scarta ${n} ${pl(n, 'carta', 'carte')} dalla mano.`, 'bad'); break; }
         case 'gearAll': { const gs = this.gearOf(p); gs.forEach(g => this.discard(g)); p.gear = { hw: null, sw: null, cr: null, gd: null }; if (gs.length) this.log(`${p.name} perde tutto l'equipaggiamento.`, 'bad'); break; }
         case 'role': if (p.role) { this.log(`${p.name} perde il ruolo ${p.role.name}.`, 'bad'); this.discard(p.role); p.role = null; } break;
-        case 'best': { const gs = this.gearOf(p).sort((a, b) => this.gBonus(p, b) - this.gBonus(p, a)); if (gs.length) { p.gear[gs[0].slot] = null; this.discard(gs[0]); this.log(`${p.name} perde ${gs[0].name}.`, 'bad'); } break; }
+        case 'best': { const g = this.bestGear(p); if (g) { p.gear[g.slot] = null; this.discard(g); this.log(`${p.name} perde ${g.name}.`, 'bad'); } break; }
         case 'penalty': p.penalty += e.n; this.log(`${p.name} avrà −${e.n} al prossimo combattimento.`, 'bad'); break;
         case 'wipe': this.applyBad(p, [{ k: 'gearAll' }, { k: 'role' }, { k: 'hand', n: 99 }]); break;
       }
@@ -462,12 +641,17 @@ class Game {
         case 'hand': return p.hand.length > 0;
         case 'gearAll': case 'best': return this.gearOf(p).length > 0;
         case 'role': return !!p.role;
+        case 'skip': return !p.skip;
+        case 'credit': return p.credit > 0;
+        case 'robbed': case 'steal': return p.hand.length > 0;
+        case 'give': case 'unequip': return e.s && e.s !== 'best' ? !!p.gear[e.s] : this.gearOf(p).length > 0;
         default: return true;
       }
     });
   }
-  addEsp(p) {
-    if (this.isRole(p, 'social')) { this.log(`${p.name} sabota senza lasciare tracce (Ingegnere sociale).`, 'sys'); return; }
+  // `forced`: Esposizione presa come penalità, non per un sabotaggio: vale anche per l'Ingegnere sociale.
+  addEsp(p, forced = false) {
+    if (!forced && this.isRole(p, 'social')) { this.log(`${p.name} sabota senza lasciare tracce (Ingegnere sociale).`, 'sys'); return; }
     p.esp++;
     if (p.esp >= ESP_MAX) {
       p.esp = 0;
@@ -484,14 +668,22 @@ class Game {
       this.fx({ kind: 'curse', by: by.id, target: t.id, card: card.name, text: this.badText(card.bad), d: card.d });
       this.addEsp(by);
     } else this.log(`${t.name} subisce «${card.name}».`, 'bad');
+    this.discard(card);
+    if (sab && t.ooo) {
+      // Risposta automatica: la Sfiga torna a chi l'ha mandata (gli effetti che richiedono un mittente svaniscono)
+      t.ooo = false;
+      this.log(`${t.name} è fuori ufficio: «${card.name}» torna a ${by.name}.`, 'good');
+      this.fx({ kind: 'bounce', by: t.id, target: by.id, card: card.name, text: this.badText(card.bad), quip: this.say('bounce') });
+      this.applyBad(by, card.bad);
+      return;
+    }
     if (sab && this.isRole(t, 'blue') && !t.blueUsed && this.curseMatters(t, card)) {
-      t.blueUsed = true; this.discard(card);
+      t.blueUsed = true;
       this.log(`${t.name} (Blue Teamer) blocca la Sfiga.`, 'good');
       this.say('block');
       return;
     }
-    this.applyBad(t, card.bad);
-    this.discard(card);
+    this.applyBad(t, card.bad, sab ? by : null);
   }
 
   /* ---------- timeout e azioni di default ---------- */
@@ -504,6 +696,7 @@ class Game {
       case 'curse': return 7;
       case 'boost': return c.amt > 0 ? 6 + c.amt / 5 : 3;
       case 'lateral': return 4;
+      case 'trick': return 7;
       case 'threat': return 3;
     }
     return 0;
@@ -555,7 +748,7 @@ class Game {
       deck: { T: this.decks.T.length, A: this.decks.A.length },
       players: this.players.map(p => ({
         id: p.id, name: p.name, isBot: p.isBot, seat: p.seat, level: p.level, title: TITLES[p.level], esp: p.esp, credit: p.credit,
-        penalty: p.penalty, role: p.role, gear: p.gear, handCount: p.hand.length, power: this.basePower(p),
+        penalty: p.penalty, role: p.role, gear: p.gear, handCount: p.hand.length, power: this.basePower(p), skip: p.skip, ooo: p.ooo,
         blueReady: this.isRole(p, 'blue') && !p.blueUsed,
         gearBonus: Object.fromEntries(Object.entries(p.gear).filter(([, g]) => g).map(([s, g]) => [s, this.gBonus(p, g)]))
       })),
@@ -565,6 +758,7 @@ class Game {
         fighter: c.fighter, helper: c.helper, share: c.share, step: c.step, passes: [...c.passes], offer: c.offer ? { ...c.offer, canCounter: c.offer.round < HELP_COUNTERS } : null,
         threats: c.threats.map(t => ({ card: t.card, mod: t.mod, eff: t.card.l + this.vsBonus(t.card, this.fighter(c)) })),
         fBonus: c.fBonus, mBonus: c.mBonus, ev: c.ev.slice(-12), asked: c.asked,
+        frozen: c.frozen, reassigned: c.reassigned, lastSab: c.lastSab ? { by: c.lastSab.by, name: c.lastSab.name } : null,
         fighterPower: this.cFighterPower(c), threatPower: this.cThreatPower(c), winning: this.cWinning(c),
         treasures: this.cTreasures(c), levels: this.cLevels(c)
       } : null,
