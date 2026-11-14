@@ -136,6 +136,34 @@ async function until(fn, ms = 5000, what = 'condizione') {
     assert(allowed, 'production con Origin rifiutata');
     srv2.kill();
     console.log('OK production origin');
+
+    // durata massima: preavviso nel registro, poi la stanza si chiude per tutti e non si rientra
+    const PORT3 = PORT + 2;
+    const srv3 = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
+      env: { ...env, PORT: String(PORT3), ROOM_MAX_MS: '2000', JANITOR_MS: '100', BOT_DELAY: '100000' }, stdio: ['ignore', 'pipe', 'inherit']
+    });
+    await wait(400);
+    const t = new WebSocket(`ws://127.0.0.1:${PORT3}/ws`), tm = [];
+    let tClosed = null;
+    t.on('message', d => tm.push(JSON.parse(d.toString())));
+    t.on('close', code => { tClosed = code; });
+    await new Promise(r => t.on('open', r));
+    const ts = m => t.send(JSON.stringify(m));
+    ts({ t: 'create', name: 'Lungo' });
+    await until(() => tm.some(m => m.t === 'session'), 3000, 'sessione');
+    const sess = tm.find(m => m.t === 'session');
+    ts({ t: 'addBot' }); ts({ t: 'addBot' });
+    await until(() => tm.some(m => m.t === 'sync' && m.room.members.length === 3), 3000, 'bot aggiunti');
+    ts({ t: 'start' });
+    await until(() => tm.some(m => m.t === 'sync' && m.view && m.view.log.some(l => l.t.includes('la partita si chiude'))), 3000, 'preavviso');
+    await until(() => tm.some(m => m.t === 'expired' && /Tempo scaduto/.test(m.msg)) && tClosed === 4002, 3000, 'chiusura');
+    const late = new WebSocket(`ws://127.0.0.1:${PORT3}/ws`), lm = [];
+    late.on('message', d => lm.push(JSON.parse(d.toString())));
+    await new Promise(r => late.on('open', r));
+    late.send(JSON.stringify({ t: 'resume', code: sess.code, token: sess.token }));
+    await until(() => lm.some(m => m.t === 'expired'), 3000, 'niente rientro');
+    late.close(); srv3.kill();
+    console.log('OK durata massima');
     process.exit(0);
   } catch (e) {
     console.error('FALLITO:', e.message);

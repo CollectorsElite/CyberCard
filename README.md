@@ -59,7 +59,7 @@ Dietro un reverse proxy, inoltra anche l'upgrade WebSocket sul path `/ws`.
 | `TIMEOUT_SCALE` | 1 | Moltiplicatore dei tempi massimi (0.5 = partite più rapide) |
 | `DISCONNECT_GRACE_MS` | 15000 | Tolleranza prima che le mosse di un disconnesso diventino automatiche |
 | `MAX_ROOMS` | 200 | Numero massimo di stanze contemporanee |
-| `ROOM_MAX_MS` | 14400000 | Età massima stanza (4 h), anche con tab AFK |
+| `ROOM_MAX_MS` | 7200000 | Durata massima (2 h): di una partita dall'avvio (la rivincita riparte da zero), di una lobby dalla creazione. 5 minuti prima un avviso nel registro, poi la stanza si chiude per tutti |
 | `MAX_CREATES_PER_SOCKET` | 5 | Cap create per connessione WebSocket |
 | `MAX_CREATES_PER_IP` | 20 | Cap create per IP / ora |
 | `ADMIN_TOKEN` | _(vuoto)_ | Abilita `/admin.html` e `/admin/api/*`. Vuoto = admin spento |

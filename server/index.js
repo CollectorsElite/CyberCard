@@ -18,7 +18,10 @@ const TIMEOUT_SCALE = +process.env.TIMEOUT_SCALE || 1;
 const TUT_HOLD_MS = 3 * 60 * 1000;
 const MAX_ROOMS = +process.env.MAX_ROOMS || 200;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
-const ROOM_MAX_MS = +process.env.ROOM_MAX_MS || 4 * 60 * 60 * 1000;
+// Durata massima di una partita (dall'avvio; una rivincita riparte da zero) e di una lobby (dalla creazione).
+const ROOM_MAX_MS = +process.env.ROOM_MAX_MS || 2 * 60 * 60 * 1000;
+const ROOM_WARN_MS = Math.min(5 * 60 * 1000, Math.round(ROOM_MAX_MS / 4)); // preavviso prima della chiusura
+const JANITOR_MS = +process.env.JANITOR_MS || 60000;
 const MAX_CREATES_PER_SOCKET = +process.env.MAX_CREATES_PER_SOCKET || 5;
 const MAX_CREATES_PER_IP = +process.env.MAX_CREATES_PER_IP || 20;
 const MIN_PLAYERS = 3, MAX_PLAYERS = 6;
@@ -71,13 +74,14 @@ function json(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
-function forceCloseRoom(code) {
+function forceCloseRoom(code, msg) {
   const room = rooms.get(code);
   if (!room) return false;
-  clearTimeout(room.timer);
+  clearTimeout(room.timer); room.timer = null;
+  room.closed = true;
   for (const m of room.members) {
     if (m.ws) {
-      send(m.ws, { t: 'expired' });
+      send(m.ws, msg ? { t: 'expired', msg } : { t: 'expired' });
       m.ws.ctx.member = null; m.ws.ctx.room = null;
       try { m.ws.close(4002, 'admin'); } catch (e) { /* ignore */ }
     }
@@ -201,7 +205,7 @@ function liftTutIfReady(room) {
   const g = room.game;
   if (!g.over && g.turn === 1 && g.phase === 'open' && !g.combat) g.setDeadline(g.to.turn);
 }
-function afterChange(room) { liftTutIfReady(room); room.lastActive = Date.now(); broadcast(room); pump(room); }
+function afterChange(room) { if (room.closed) return; liftTutIfReady(room); room.lastActive = Date.now(); broadcast(room); pump(room); }
 
 function allowCreate(ws) {
   if (++ws.ctx.createTries > MAX_CREATES_PER_SOCKET) return false;
@@ -302,6 +306,7 @@ function startGame(room) {
     timeouts: Object.fromEntries(Object.entries(DEFAULT_TIMEOUTS).map(([k, v]) => [k, Math.round(v * TIMEOUT_SCALE)]))
   });
   room.members = players;
+  room.startedAt = Date.now(); room.warned = false;
   room.tutReady = new Set();
   room.tutHeld = players.some(m => !m.isBot);
   if (room.tutHeld) room.game.setDeadline(Math.round(TUT_HOLD_MS * TIMEOUT_SCALE));
@@ -485,11 +490,25 @@ const janitor = setInterval(() => {
       }
     }
     const online = room.members.some(m => !m.isBot && m.connected);
-    const stale = now - room.createdAt > ROOM_MAX_MS;
+    const age = now - (room.game ? room.startedAt : room.createdAt);
     const idle = !online && now - room.lastActive > ROOM_IDLE_MS;
-    if (stale || idle) { clearTimeout(room.timer); rooms.delete(code); }
+    if (age > ROOM_MAX_MS) { forceCloseRoom(code, `Tempo scaduto: le partite durano al massimo ${fmtDur(ROOM_MAX_MS)}. La stanza è stata chiusa.`); continue; }
+    if (idle) { forceCloseRoom(code); continue; }
+    // preavviso nel registro, una volta sola, solo a partita in corso
+    if (room.game && !room.game.over && !room.warned && age > ROOM_MAX_MS - ROOM_WARN_MS) {
+      room.warned = true;
+      room.game.log(`Tra ${fmtDur(ROOM_MAX_MS - age)} la partita si chiude: il limite è ${fmtDur(ROOM_MAX_MS)}.`, 'audit');
+      room.game.version++;
+      afterChange(room);
+    }
   }
-}, 60000);
+}, JANITOR_MS);
+function fmtDur(ms) {
+  const min = Math.max(1, Math.round(ms / 60000));
+  if (min < 60) return `${min} ${min === 1 ? 'minuto' : 'minuti'}`;
+  const h = Math.floor(min / 60), r = min % 60;
+  return `${h} ${h === 1 ? 'ora' : 'ore'}${r ? ` e ${r} minuti` : ''}`;
+}
 
 function shutdown() {
   for (const ws of wss.clients) send(ws, { t: 'error', msg: 'Il server si sta riavviando: le partite in corso andranno perse.' });

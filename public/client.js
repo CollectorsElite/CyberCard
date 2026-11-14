@@ -91,7 +91,7 @@
         break;
       }
       case 'error': S.actPending = false; toast(m.msg, 'bad'); break;
-      case 'expired': clearSession(); toast('Sessione scaduta: la stanza non esiste più.', 'warn'); render(); break;
+      case 'expired': clearSession(); toast(m.msg || 'Sessione scaduta: la stanza non esiste più.', 'warn', m.msg ? 12000 : undefined); render(); break;
       case 'kicked': clearSession(); toast('L\'host ti ha rimosso dalla stanza.', 'warn'); render(); break;
       case 'left': clearSession(); render(); break;
     }
