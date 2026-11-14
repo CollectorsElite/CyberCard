@@ -415,11 +415,12 @@
     if (c) {
       const f = P(c.fighter), h = c.helper ? P(c.helper) : null;
       const fdet = [`livello ${f.level}`, `asset +${sumGear(f)}`];
+      if (c.double) fdet.push(`pair programming ×2`);
       if (c.fBonus) fdet.push(`bonus ${c.fBonus > 0 ? '+' : '−'}${Math.abs(c.fBonus)}`); // negativo se l'IA ha allucinato
       if (f.penalty) fdet.push(`policy −${f.penalty}`);
       if (h) fdet.push(`${h.name} +${h.power}`);
       const multi = c.threats.length > 1;
-      const mdet = multi ? c.threats.map(t => `${t.card.name} ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`) : c.threats.map(t => `forza ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`);
+      const mdet = multi ? c.threats.map(t => `${t.card.name}${t.copy ? ' (copia)' : ''} ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`) : c.threats.map(t => `forza ${t.eff}${t.mod ? (t.mod > 0 ? ' +' : ' ') + t.mod : ''}`);
       if (c.mBonus) mdet.push(`interferenze ${c.mBonus > 0 ? '+' : '−'}${Math.abs(c.mBonus)}`);
       let k = 'Combattimento', m = '';
       const mineFight = c.fighter === S.you;
@@ -526,7 +527,10 @@
       case 'honeypot': return !!c.lastSab && c.lastSab.by !== me;
       case 'falsepos': return mine || !mp;
       case 'oncall': return fighter && !c.helper;
-      case 'ai': case 'reboot': return true;
+      case 'ai': case 'reboot': case 'mate': case 'cascade': return true;
+      case 'double': return !c.double;
+      case 'standoff': return c.step === 'window' && !(P(c.fighter).role && P(c.fighter).role.role === 'red') && c.fighterPower !== c.threatPower;
+      case 'lunch': return mine || !mp;
     }
     return false;
   }
@@ -692,6 +696,11 @@
             case 'honeypot': B.push({ label: `Annulla «${c.lastSab.name}» di ${name(c.lastSab.by)}`, cls: 'primary', on: T() }); break;
             case 'falsepos': B.push({ label: mine ? 'Annulla il combattimento: niente premi, niente penalità' : `Annulla il combattimento di ${name(c.fighter)}${c.winning ? ' · sabotaggio' : ''}`, cls: mine || !c.winning ? 'primary' : 'danger', on: T() }); break;
             case 'reboot': B.push({ label: 'Azzera tutti i bonus e le interferenze', cls: 'primary', on: T() }); break;
+            case 'mate': B.push({ label: `Duplica ${c.threats[c.threats.length - 1].card.name}${mine ? '' : ' · sabotaggio'}`, cls: mine ? '' : 'danger', on: T() }); break;
+            case 'cascade': B.push({ label: `Fai entrare la prossima Minaccia del mazzo${mine ? '' : ' · sabotaggio'}`, cls: mine ? '' : 'danger', on: T() }); break;
+            case 'double': B.push({ label: `Raddoppia la forza base di ${c.fighter === S.you ? 'te stesso' : name(c.fighter)}`, cls: 'primary', on: T() }); break;
+            case 'standoff': B.push({ label: `Porta la minaccia in pareggio (${c.fighterPower})${!mine && c.winning ? ' · sabotaggio' : ''}`, cls: !mine && c.winning ? 'danger' : 'primary', on: T() }); break;
+            case 'lunch': B.push({ label: mine ? 'Chiudi il combattimento: tesori sì, livelli no' : `Manda in pausa pranzo la minaccia di ${name(c.fighter)}${c.winning ? ' · sabotaggio' : ''}`, cls: mine || !c.winning ? 'primary' : 'danger', on: T() }); break;
             case 'ai':
               B.push({ label: mine ? 'Tira il dado per il tuo lato' : `Tira il dado per ${name(c.fighter)}`, cls: mine ? 'primary' : '', on: T({ side: 'f' }) });
               B.push({ label: `Tira il dado per la minaccia${mine ? '' : ' · sabotaggio'}`, cls: mine ? '' : 'danger', on: T({ side: 'm' }) });

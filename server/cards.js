@@ -84,7 +84,13 @@ const TRICKS_T = [
   ['poach', '«Hai un minuto?»', 2, 'Non era un minuto. Non lo è mai.'],
   ['freeze', 'Change freeze', 2, 'Fino a lunedì non si tocca niente. Nemmeno quello che è rotto.'],
   ['honeypot', 'Honeypot', 2, 'Sembrava un server dimenticato. Aveva i log accesi.'],
-  ['falsepos', 'Falso positivo', 2, 'Il SOC chiude il ticket: non era niente. Forse.']
+  ['falsepos', 'Falso positivo', 2, 'Il SOC chiude il ticket: non era niente. Forse.'],
+  // ispirate alle carte di Munchkin che cambiano un combattimento (meccaniche, testi originali)
+  ['mate', 'Il malware era nel backup', 2, 'Ripristino completato. Anche lui.'],
+  ['double', 'Pair programming', 2, 'Due tastiere, un cervello solo. Stavolta basta.'],
+  ['standoff', 'Escalation al management', 1, 'Sentite le parti, il management decide di non decidere.'],
+  ['lunch', 'Pausa pranzo', 2, 'È l\'una. Anche gli attaccanti mangiano.'],
+  ['cascade', 'Alert a cascata', 2, 'Un alert ne apre un altro. Che ne apre un altro.']
 ];
 // Mazzo Asset, Uso singolo: [fx, nome, copie, valore, testo]
 const TRICKS_A = [
@@ -106,7 +112,12 @@ const TRICK_TEXT = {
   ooo: 'In qualsiasi momento: fino al tuo prossimo turno, la prima Sfiga che ti giocano torna a chi l\'ha mandata.',
   ai: 'In un combattimento, a una delle due parti: tira un dado. 1: −3 (allucinazione). Da 2 a 5: + il numero uscito. 6: +8.',
   reboot: 'In un combattimento: azzera tutti i bonus e le interferenze giocati finora, da entrambe le parti.',
-  reassign: 'Appena inizi un combattimento: lo passi a un altro giocatore, che lo affronta al posto tuo con premi e penalità. +1 Esposizione.'
+  reassign: 'Appena inizi un combattimento: lo passi a un altro giocatore, che lo affronta al posto tuo con premi e penalità. +1 Esposizione.',
+  mate: 'In un combattimento: l\'ultima Minaccia entrata si duplica, con le sue interferenze. Forza, livelli e tesori raddoppiano. Sul combattimento di un altro è un sabotaggio.',
+  double: 'In un combattimento: la forza di chi combatte (livello e asset, senza bonus né aiutante) conta doppio. Una sola volta per combattimento.',
+  standoff: 'A finestra aperta: la Minaccia prende esattamente la forza di chi combatte. Il pareggio lo vince la Minaccia. Vale anche contro chi sta per arrivare a root.',
+  lunch: 'In un combattimento: la Minaccia va a pranzo. Chi combatte incassa i tesori ma non i livelli. Se la gioca un altro è un sabotaggio, e non ferma chi sta per arrivare a root.',
+  cascade: 'In un combattimento: si scoprono carte dal mazzo Ticket finché esce una Minaccia, che entra nello scontro. Le altre vanno negli scarti. Sul combattimento di un altro è un sabotaggio.'
 };
 const SLOT_NAMES = { hw: 'Hardware', sw: 'Software', cr: 'Credenziali', gd: 'Gadget' };
 const plur = (n, a, b) => (n === 1 ? a : b);
@@ -140,23 +151,23 @@ function badText(effects) {
 
 // [slot, nome, bonus, valore, testo, copie, roleBonus?]
 const GEAR = [
-  ['hw', 'Laptop pieno di adesivi', 1, 200, 'Uno dice «I ♥ sudo».', 3],
+  ['hw', 'Laptop pieno di adesivi', 1, 200, 'Uno dice «I ♥ sudo».', 2],
   ['hw', 'Raspberry Pi nel controsoffitto', 2, 300, 'Nessuno sa chi l\'ha messo lì.', 2],
   ['hw', 'Workstation con GPU da mutuo', 3, 600, 'D\'inverno scalda l\'ufficio.', 2],
-  ['hw', 'Chiavetta USB trovata nel parcheggio', 2, 100, 'Cosa potrebbe andare storto?', 3],
-  ['sw', 'Script Bash non commentato', 1, 100, 'Funziona. Nessuno sa perché.', 3, { role: 'sys', n: 2 }],
+  ['hw', 'Chiavetta USB trovata nel parcheggio', 2, 100, 'Cosa potrebbe andare storto?', 2],
+  ['sw', 'Script Bash non commentato', 1, 100, 'Funziona. Nessuno sa perché.', 2, { role: 'sys', n: 2 }],
   ['sw', 'Regex che capisci solo tu', 2, 300, 'Scritta da te, letta da nessuno.', 2],
   ['sw', 'Firewall configurato a mano', 2, 400, 'Ottocento regole, tre in conflitto.', 2],
   ['sw', 'EDR in modalità paranoia', 3, 600, 'Blocca anche te. Soprattutto te.', 2],
   ['cr', 'Password «Estate2024!»', 1, 100, 'Valida fino alla prossima estate.', 3],
   ['cr', 'Token di servizio mai ruotato', 2, 400, 'L\'ha creato il tuo predecessore.', 2],
   ['cr', 'Domain admin dimenticato', 3, 700, 'Ultimo accesso: mai. Ultimo audit: mai.', 2],
-  ['gd', 'Tazza «Sulla mia macchina va»', 1, 200, 'Prova inconfutabile.', 3],
-  ['gd', 'Cuffie antirumore', 2, 300, 'Il segnale universale per «non ora».', 2],
+  ['gd', 'Tazza «Sulla mia macchina va»', 1, 200, 'Prova inconfutabile.', 2],
+  ['gd', 'Cuffie antirumore', 2, 300, 'Il segnale universale per «non ora».', 1],
   ['gd', 'Badge clonato', 2, 400, 'Apre anche la sala server.', 2],
   ['gd', 'Felpa col cappuccio d\'ordinanza', 1, 200, 'Il cappuccio si alza quando parte lo scan.', 2, { role: 'red', n: 2 }],
-  ['gd', 'Tastiera meccanica da open space', 1, 200, 'Ogni tasto è un annuncio pubblico.', 3],
-  ['gd', 'Torre di post-it «TODO»', 1, 100, 'Il debito tecnico in forma cartacea.', 3]
+  ['gd', 'Tastiera meccanica da open space', 1, 200, 'Ogni tasto è un annuncio pubblico.', 2],
+  ['gd', 'Torre di post-it «TODO»', 1, 100, 'Il debito tecnico in forma cartacea.', 1]
 ];
 
 // [nome, bonus, valore, copie, testo]
@@ -391,6 +402,26 @@ const QUIPS = {
   'trick:reboot': [
     'Hai provato a spegnere e riaccendere? Io sì.',
     'Riavvio. Tutto quello che avevate fatto: perso.'
+  ],
+  'trick:mate': [
+    'Ripristinato dal backup. Lui e il suo gemello.',
+    'Bel ripristino. Peccato fosse infetto.'
+  ],
+  'trick:double': [
+    'Pair programming: uno scrive, l\'altro giudica.',
+    'In due si sbaglia il doppio più in fretta. Oggi no.'
+  ],
+  'trick:standoff': [
+    'Ho portato la questione al management. Pari e patta.',
+    'Il manager ha deciso: si rimanda. Tu intanto perdi.'
+  ],
+  'trick:lunch': [
+    'Pausa pranzo. Il problema aspetta, il buono pasto no.',
+    'Si riprende alle due. Forse alle tre.'
+  ],
+  'trick:cascade': [
+    'Un alert tira l\'altro. Buon divertimento.',
+    'Il monitoraggio funziona benissimo. Purtroppo.'
   ],
   'trick:reassign': [
     'Non è di mia competenza. Te lo riassegno.',

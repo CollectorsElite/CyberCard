@@ -279,4 +279,86 @@ function fight(g, f, card) { g.startCombat(f, [card]); g.handle(f.id, { type: 'f
   assert.deepStrictEqual(a.hand, hb); assert.deepStrictEqual(b.hand, ha);
 }
 
+// 16. Il malware era nel backup: la minaccia si duplica con le sue interferenze; livelli e tesori raddoppiano; la copia non va negli scarti
+{
+  const g = setup(), [f, s] = g.players;
+  f.level = 7;
+  const mate = give(g, s, trick('mate'));
+  const c = fight(g, f, threat(1));
+  c.threats[0].mod = 2;
+  g.handle(s.id, { type: 'trick', card: mate.uid });
+  assert.strictEqual(c.threats.length, 2);
+  assert(c.threats[1].copy && c.threats[1].mod === 2, 'la copia porta con sé le interferenze');
+  assert.strictEqual(g.cThreatPower(), 6);
+  assert.strictEqual(g.cLevels(), 2);
+  assert.strictEqual(g.cTreasures(), 4);
+  assert(s.esp === 1 && c.lastSab, 'contro un altro è un sabotaggio');
+  const disc = g.disc.T.length;
+  for (const p of g.players) g.handle(p.id, { type: 'pass' });
+  assert(!g.combat && f.level === 9, 'vince e prende due livelli');
+  assert.strictEqual(g.disc.T.length - disc, 1, 'negli scarti va una carta sola');
+}
+
+// 17. Pair programming: la forza base conta doppio, una volta sola; Spegni e riaccendi lo azzera
+{
+  const g = setup(), [f, s] = g.players;
+  f.level = 4;
+  const d1 = give(g, f, trick('double')), d2 = give(g, s, trick('double')), rb = give(g, s, trick('reboot'));
+  const c = fight(g, f, threat(6));
+  assert(!g.cWinning());
+  g.handle(f.id, { type: 'trick', card: d1.uid });
+  assert(c.double && g.cFighterPower() === 8 && g.cWinning());
+  refuses(() => g.handle(s.id, { type: 'trick', card: d2.uid }), 'una volta per combattimento');
+  g.handle(s.id, { type: 'trick', card: rb.uid });
+  assert(!c.double && !g.cWinning(), 'il riavvio azzera anche il pair programming');
+}
+
+// 18. Escalation al management: pareggio esatto, anche a match point; non contro un Red Teamer; l'Honeypot lo annulla
+{
+  const g = setup(), [f, s] = g.players;
+  f.level = 9;
+  const so = give(g, s, trick('standoff')), hp = give(g, f, trick('honeypot'));
+  const c = fight(g, f, threat(3));
+  g.handle(s.id, { type: 'trick', card: so.uid });
+  assert(g.cFighterPower() === g.cThreatPower() && !g.cWinning() && s.esp === 1);
+  g.handle(f.id, { type: 'trick', card: hp.uid });
+  assert(g.cWinning() && c.mBonus === 0, 'annullato dall\'Honeypot');
+
+  const g2 = setup(), [f2, s2] = g2.players;
+  f2.level = 5; f2.role = take(g2, x => x.type === 'role' && x.role === 'red');
+  const so2 = give(g2, s2, trick('standoff'));
+  fight(g2, f2, threat(2));
+  refuses(() => g2.handle(s2.id, { type: 'trick', card: so2.uid }), 'il Red Teamer vince i pareggi');
+}
+
+// 19. Pausa pranzo: tesori sì, livelli no; un altro non la gioca su chi sta per prendere root
+{
+  const g = setup(), [f, s] = g.players;
+  f.level = 3;
+  const lu = give(g, f, trick('lunch'));
+  fight(g, f, threat(12));
+  const hand = f.hand.length;
+  g.handle(f.id, { type: 'trick', card: lu.uid });
+  assert(!g.combat && f.level === 3 && f.hand.length === hand - 1 + 2 && g.phase === 'end', 'due tesori, nessun livello');
+
+  const g2 = setup(), [f2, s2] = g2.players;
+  f2.level = 9;
+  const lu2 = give(g2, s2, trick('lunch'));
+  fight(g2, f2, threat(2));
+  refuses(() => g2.handle(s2.id, { type: 'trick', card: lu2.uid }), 'non ferma un match point');
+  assert(s);
+}
+
+// 20. Alert a cascata: la prima Minaccia del mazzo entra nello scontro, le carte scoperte prima vanno negli scarti
+{
+  const g = setup(), [f, s] = g.players;
+  f.level = 6;
+  const al = give(g, s, trick('cascade'));
+  const curse = take(g, x => x.type === 'curse'), th = take(g, x => x.type === 'threat' && x.l === 5);
+  g.decks.T.push(th, curse); // si pesca dalla fine: prima la Sfiga, poi la Minaccia
+  const c = fight(g, f, threat(2));
+  g.handle(s.id, { type: 'trick', card: al.uid });
+  assert(c.threats.length === 2 && c.threats[1].card === th && g.disc.T.includes(curse) && s.esp === 1);
+}
+
 console.log('OK tricks');

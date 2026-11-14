@@ -67,7 +67,8 @@ function selfBoost(g, f, c) {
   if (g.cWinning(c)) return null;
   const opts = f.hand.filter(x => x.type === 'oneshot' && !x.escape).map(x => ({ card: x, val: x.bonus, a: { type: 'play', card: x.uid, side: 'f' } }))
     .concat(f.hand.filter(x => x.type === 'boost' && x.amt < 0).map(x => ({ card: x, val: -x.amt, a: { type: 'play', card: x.uid } })))
-    .concat(f.hand.filter(x => x.type === 'trick' && x.fx === 'ai').map(x => ({ card: x, val: 3, a: { type: 'trick', card: x.uid, side: 'f' } })));
+    .concat(f.hand.filter(x => x.type === 'trick' && x.fx === 'ai').map(x => ({ card: x, val: 3, a: { type: 'trick', card: x.uid, side: 'f' } })))
+    .concat(!c.double ? f.hand.filter(x => x.type === 'trick' && x.fx === 'double').slice(0, 1).map(x => ({ card: x, val: g.basePower(f), a: { type: 'trick', card: x.uid } })) : []);
   const need = g.cThreatPower(c) - g.cFighterPower(c) + (g.isRole(f, 'red') ? 0 : 1);
   if (opts.reduce((s, o) => s + o.val, 0) < need) return null;
   return pickCards(opts, need)[0].a;
@@ -105,6 +106,11 @@ function fighterTricks(g, f, c) {
   }
   return null;
 }
+// In svantaggio, senza aiuto: meglio i tesori senza livelli che rischiare la fuga.
+function lunchOut(g, f, c) {
+  const card = trick(f, 'lunch');
+  return card && !g.cWinning(c) && (severe(g, c) || g.cTreasures(c) >= 2) ? { type: 'trick', card: card.uid } : null;
+}
 // Riassegnazione: scarica il ticket su chi probabilmente lo perde, meglio se è in testa.
 function reassign(g, f, c) {
   const card = trick(f, 'reassign');
@@ -138,10 +144,17 @@ function interfere(g, b, c) {
   b.hand.filter(x => x.type === 'trick' && x.fx === 'ai').forEach(x => opts.push({ val: 3, a: { type: 'trick', card: x.uid, side: 'm' } }));
   const po = trick(b, 'poach'), h = g.helper(c);
   if (po && h) opts.push({ val: g.basePower(h), a: { type: 'trick', card: po.uid } });
+  const last = c.threats[c.threats.length - 1], mt = trick(b, 'mate');
+  if (mt) opts.push({ val: last.card.l + last.mod + g.vsBonus(last.card, f), a: { type: 'trick', card: mt.uid } });
+  const cs = trick(b, 'cascade');
+  if (cs) opts.push({ val: 4, a: { type: 'trick', card: cs.uid } }); // forza attesa prudente: il mazzo è pieno di minacce piccole
   const best = g.bestGear(f), hot = b.hand.find(x => x.type === 'curse' && x.bad[0].k === 'unequip');
   if (hot && best) opts.push({ val: g.gBonus(f, best), a: { type: 'curse', card: hot.uid, target: f.id } });
   const need = g.cFighterPower(c) - g.cThreatPower(c) + (g.isRole(f, 'red') ? 1 : 0);
   const total = opts.reduce((s, o) => s + o.val, 0);
+  // Escalation al management: porta la minaccia al pareggio, quindi basta da sola (non contro un Red Teamer)
+  const so = trick(b, 'standoff');
+  if (so && !g.isRole(f, 'red') && c.step === 'window' && (must || total < need)) return { type: 'trick', card: so.uid };
   if (total < need || !opts.length) {
     // se le carte non bastano, contro chi è lanciato resta il Falso positivo (ma non a match point)
     const fp = trick(b, 'falsepos');
@@ -191,6 +204,7 @@ function decide(g, pid) {
         if (!g.cWinning(c)) {
           const s = selfBoost(g, b, c) || fighterTricks(g, b, c); if (s) return s;
           if (!c.helper) { const h = pickHelper(g, b, c); if (h) return { type: 'askHelp', to: h.p.id, share: h.share }; }
+          const lo = lunchOut(g, b, c); if (lo) return lo;
           const fp = trick(b, 'falsepos'); if (fp && severe(g, c)) return { type: 'trick', card: fp.uid };
         } else if (c.lastSab && !matchPoint(g, c)) {
           // già sabotato una volta e di nuovo in vantaggio: congela tutto

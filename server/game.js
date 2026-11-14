@@ -82,12 +82,13 @@ class Game {
   vsBonus(card, p) { return card.vs && this.isRole(p, card.vs.role) ? card.vs.n : 0; }
   fighter(c = this.combat) { return this.p(c.fighter); }
   helper(c = this.combat) { return c.helper ? this.p(c.helper) : null; }
-  cFighterPower(c = this.combat) { const f = this.fighter(c), h = this.helper(c); return this.basePower(f) + c.fBonus - f.penalty + (h ? this.basePower(h) : 0); }
+  // con Pair programming la forza base di chi combatte conta doppio
+  cFighterPower(c = this.combat) { const f = this.fighter(c), h = this.helper(c); return this.basePower(f) * (c.double ? 2 : 1) + c.fBonus - f.penalty + (h ? this.basePower(h) : 0); }
   cThreatPower(c = this.combat) { const f = this.fighter(c); return c.threats.reduce((s, t) => s + t.card.l + t.mod + this.vsBonus(t.card, f), 0) + c.mBonus; }
   cWinning(c = this.combat) { const a = this.cFighterPower(c), b = this.cThreatPower(c); return a > b || (a === b && this.isRole(this.fighter(c), 'red')); }
   cTreasures(c = this.combat) { return Math.max(0, c.threats.reduce((s, t) => s + t.card.tr + t.trMod, 0)); }
   cLevels(c = this.combat) { return c.threats.reduce((s, t) => s + t.card.lv + (t.lvMod || 0), 0); }
-  threatNames(c = this.combat) { return c.threats.map(t => t.card.name).join(' + '); }
+  threatNames(c = this.combat) { return c.threats.map(t => t.card.name + (t.copy ? ' (copia)' : '')).join(' + '); }
 
   /* ---------- chi deve agire ---------- */
   needs() {
@@ -440,12 +441,71 @@ class Game {
   }
   t_reboot(p, card) {
     const c = this.combatPlay(p), was = this.cWinning(c);
-    c.fBonus = 0; c.mBonus = 0; c.lastSab = null;
+    c.fBonus = 0; c.mBonus = 0; c.lastSab = null; c.double = false;
     c.threats.forEach(t => { t.mod = 0; t.trMod = 0; t.lvMod = 0; });
     this.spend(p, card);
     const txt = `${p.name}: Spegni e riaccendi. Azzerati tutti i bonus e le interferenze`;
     if (this.outsider(p, c) && was && !this.cWinning(c)) this.sabotage(p, txt, card);
     else { this.cEv(c, txt); this.fx({ kind: 'reboot', by: p.id, quip: this.say('trick', 'reboot') }); }
+    this.touch(c);
+  }
+  t_mate(p, card) {
+    const c = this.combatPlay(p), t = c.threats[c.threats.length - 1];
+    const copy = { card: t.card, mod: t.mod, trMod: t.trMod, lvMod: t.lvMod, copy: true };
+    c.threats.push(copy);
+    this.spend(p, card);
+    const txt = `${p.name}: Il malware era nel backup, ${t.card.name} si duplica (forza ${t.card.l + t.mod})`;
+    if (this.outsider(p, c)) this.sabotage(p, txt, card, () => { const i = c.threats.indexOf(copy); if (i > 0) c.threats.splice(i, 1); });
+    else { this.cEv(c, txt); this.say('trick', 'mate'); }
+    this.touch(c);
+  }
+  t_double(p, card) {
+    const c = this.combatPlay(p);
+    if (c.double) fail('Pair programming è già in corso in questo combattimento.');
+    c.double = true;
+    this.spend(p, card);
+    const f = this.fighter(c);
+    this.cEv(c, `${p.name}: Pair programming, la forza base di ${f.name} conta doppio (+${this.basePower(f)})`, 'good');
+    this.say('trick', 'double');
+    this.touch(c);
+  }
+  t_standoff(p, card) {
+    const c = this.combatPlay(p), f = this.fighter(c);
+    if (c.step !== 'window') fail('L\'escalation al management si gioca a finestra aperta.');
+    if (this.isRole(f, 'red')) fail('Contro un Red Teamer il pareggio non basta: vince lui.');
+    const delta = this.cFighterPower(c) - this.cThreatPower(c), was = this.cWinning(c);
+    if (!delta) fail('Le due parti sono già in pareggio.');
+    c.mBonus += delta;
+    this.spend(p, card);
+    const txt = `${p.name}: Escalation al management, la minaccia sale a ${this.cThreatPower(c)}: pareggio`;
+    if (this.outsider(p, c) && was) this.sabotage(p, txt, card, () => { c.mBonus -= delta; });
+    else { this.cEv(c, txt); this.say('trick', 'standoff'); }
+    this.touch(c);
+  }
+  t_lunch(p, card) {
+    const c = this.combatPlay(p), f = this.fighter(c);
+    if (this.outsider(p, c) && f.level + this.cLevels(c) >= WIN_LEVEL) fail('Chi sta per prendere root non va in pausa pranzo.');
+    this.spend(p, card);
+    const txt = `${p.name}: Pausa pranzo. ${this.threatNames(c)} se ne va: ${f.name} incassa i tesori, niente livelli`;
+    if (this.outsider(p, c) && this.cWinning(c)) this.sabotage(p, txt, card);
+    else { this.cEv(c, txt); this.say('trick', 'lunch'); }
+    this.resolveWin(c, false);
+    this.endCombat();
+  }
+  t_cascade(p, card) {
+    const c = this.combatPlay(p);
+    this.spend(p, card);
+    let th = null;
+    for (let i = 0; i < 40 && !th; i++) {
+      const x = this.draw('T'); if (!x) break;
+      if (x.type === 'threat') th = x; else this.discard(x);
+    }
+    if (!th) { this.cEv(c, `${p.name}: Alert a cascata, ma nel mazzo non c'è nessuna minaccia`); return this.touch(c); }
+    const entry = { card: th, mod: 0, trMod: 0, lvMod: 0 };
+    c.threats.push(entry);
+    const txt = `${p.name}: Alert a cascata, entra ${th.name} (forza ${th.l})`;
+    if (this.outsider(p, c)) this.sabotage(p, txt, card, () => { const i = c.threats.indexOf(entry); if (i > 0) { c.threats.splice(i, 1); this.discard(th); } });
+    else { this.cEv(c, txt); this.say('trick', 'cascade'); }
     this.touch(c);
   }
   t_reassign(p, card, a) {
@@ -564,17 +624,18 @@ class Game {
     this.say('rollback');
     this.endCombat();
   }
-  resolveWin(c) {
-    const f = this.fighter(c), h = this.helper(c), tr = this.cTreasures(c), lv = this.cLevels(c);
+  // levels = false: Pausa pranzo, si incassano i tesori ma non i livelli
+  resolveWin(c, levels = true) {
+    const f = this.fighter(c), h = this.helper(c), tr = this.cTreasures(c), lv = levels ? this.cLevels(c) : 0;
     const share = h ? Math.min(tr, c.share) : 0;
     const gotH = [], gotF = [];
     for (let i = 0; i < share; i++) { const x = this.draw('A'); if (x) { h.hand.push(x); gotH.push(x.name); } }
     for (let i = share; i < tr; i++) { const x = this.draw('A'); if (x) { f.hand.push(x); gotF.push(x.name); } }
     f.level = Math.min(WIN_LEVEL, f.level + lv);
-    this.log(`${f.name} neutralizza ${this.threatNames(c)}: +${lv} ${pl(lv, 'livello', 'livelli')}, ${tr} ${pl(tr, 'tesoro', 'tesori')}.`, 'good');
-    const q = f.level >= WIN_LEVEL ? '' : this.say('win');
+    this.log(levels ? `${f.name} neutralizza ${this.threatNames(c)}: +${lv} ${pl(lv, 'livello', 'livelli')}, ${tr} ${pl(tr, 'tesoro', 'tesori')}.` : `${f.name} incassa ${tr} ${pl(tr, 'tesoro', 'tesori')} senza combattere: la minaccia è a pranzo.`, 'good');
+    const q = f.level >= WIN_LEVEL || !levels ? '' : this.say('win');
     if (h) this.log(`${h.name} incassa ${share} ${pl(share, 'tesoro', 'tesori')} per l'aiuto.`);
-    this.fx({ kind: 'win', pid: f.id, lv, level: f.level, quip: q });
+    if (levels) this.fx({ kind: 'win', pid: f.id, lv, level: f.level, quip: q });
     if (gotF.length) this.fx({ kind: 'drawn', to: f.id, cards: gotF });
     if (gotH.length) this.fx({ kind: 'drawn', to: h.id, cards: gotH });
     if (f.level >= WIN_LEVEL) {
@@ -585,7 +646,7 @@ class Game {
   }
   endCombat() {
     const c = this.combat; if (!c) return;
-    c.threats.forEach(t => this.discard(t.card));
+    c.threats.forEach(t => { if (!t.copy) this.discard(t.card); }); // le copie del Malware nel backup non sono carte vere
     this.fighter(c).penalty = 0;
     this.combat = null;
     if (!this.over) { this.phase = 'end'; this.setDeadline(this.to.turn); }
@@ -756,9 +817,9 @@ class Game {
       revealed: this.revealed,
       combat: c ? {
         fighter: c.fighter, helper: c.helper, share: c.share, step: c.step, passes: [...c.passes], offer: c.offer ? { ...c.offer, canCounter: c.offer.round < HELP_COUNTERS } : null,
-        threats: c.threats.map(t => ({ card: t.card, mod: t.mod, eff: t.card.l + this.vsBonus(t.card, this.fighter(c)) })),
+        threats: c.threats.map(t => ({ card: t.card, mod: t.mod, copy: !!t.copy, eff: t.card.l + this.vsBonus(t.card, this.fighter(c)) })),
         fBonus: c.fBonus, mBonus: c.mBonus, ev: c.ev.slice(-12), asked: c.asked,
-        frozen: c.frozen, reassigned: c.reassigned, lastSab: c.lastSab ? { by: c.lastSab.by, name: c.lastSab.name } : null,
+        frozen: c.frozen, reassigned: c.reassigned, double: !!c.double, lastSab: c.lastSab ? { by: c.lastSab.by, name: c.lastSab.name } : null,
         fighterPower: this.cFighterPower(c), threatPower: this.cThreatPower(c), winning: this.cWinning(c),
         treasures: this.cTreasures(c), levels: this.cLevels(c)
       } : null,

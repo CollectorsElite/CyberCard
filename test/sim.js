@@ -9,7 +9,7 @@ function allUids(g) {
   const push = c => c && ids.push(c.uid);
   g.decks.T.forEach(push); g.decks.A.forEach(push); g.disc.T.forEach(push); g.disc.A.forEach(push);
   for (const p of g.players) { p.hand.forEach(push); Object.values(p.gear).forEach(push); push(p.role); }
-  if (g.combat) g.combat.threats.forEach(t => push(t.card));
+  if (g.combat) g.combat.threats.forEach(t => { if (!t.copy) push(t.card); }); // le copie del Malware nel backup non sono carte
   return ids;
 }
 function check(g, total) {

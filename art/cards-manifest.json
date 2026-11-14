@@ -448,6 +448,41 @@
     "stars": 3
   },
   {
+    "slug": "trick-il-malware-era-nel-backup",
+    "color": "green",
+    "name": "Il malware era nel backup",
+    "text": "Ripristino completato. Anche lui.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-pair-programming",
+    "color": "green",
+    "name": "Pair programming",
+    "text": "Due tastiere, un cervello solo. Stavolta basta.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-escalation-al-management",
+    "color": "green",
+    "name": "Escalation al management",
+    "text": "Sentite le parti, il management decide di non decidere.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-pausa-pranzo",
+    "color": "green",
+    "name": "Pausa pranzo",
+    "text": "È l'una. Anche gli attaccanti mangiano.",
+    "stars": 3
+  },
+  {
+    "slug": "trick-alert-a-cascata",
+    "color": "green",
+    "name": "Alert a cascata",
+    "text": "Un alert ne apre un altro. Che ne apre un altro.",
+    "stars": 3
+  },
+  {
     "slug": "trick-turno-di-reperibilita",
     "color": "blue",
     "name": "Turno di reperibilità",
