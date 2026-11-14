@@ -228,7 +228,8 @@ function decide(g, pid) {
   if (g.phase === 'open') return { type: 'openTicket' };
   if (g.phase === 'after') {
     const myP = g.basePower(b) - b.penalty;
-    const margin = th => myP - (th.l + g.vsBonus(th, b)) - (b.level + th.lv >= 10 ? 6 : 3);
+    // basta essere in vantaggio di 1, come farebbe una persona; a match point serve margine, perché tutti sabotano
+    const margin = th => myP - (th.l + g.vsBonus(th, b)) - (b.level + th.lv >= 10 ? 6 : 1);
     const t = b.hand.filter(x => x.type === 'threat' && margin(x) >= 0).sort((x, y) => y.l - x.l)[0];
     if (t) return { type: 'trouble', card: t.uid };
     return { type: 'loot' };

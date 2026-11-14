@@ -308,10 +308,16 @@ class Game {
       this.removeFromHand(p, card); this.removeFromHand(p, th); this.discard(card);
       c.threats.push({ card: th, mod: 0, trMod: 0, lvMod: 0 });
       txt = `${p.name}: Movimento laterale, entra ${th.name} (forza ${th.l}). «${th.d}»`;
-      if (sabot) this.sabotage(p, txt, card, () => { const i = c.threats.findIndex(x => x.card === th); if (i > 0) { c.threats.splice(i, 1); this.discard(th); } });
+      if (sabot) this.sabotage(p, txt, card, () => this.dropThreat(c, th));
       else this.cEv(c, txt);
     }
     this.touch(c);
+  }
+  // Toglie dal combattimento una minaccia entrata dopo la prima, con le sue eventuali copie.
+  dropThreat(c, card) {
+    const before = c.threats.length;
+    c.threats = c.threats.filter((x, i) => i === 0 || x.card !== card);
+    if (c.threats.length < before) this.discard(card);
   }
   cEv(c, txt, cls = '') { c.ev.push(txt); this.log(txt, cls); }
   // `undo` rimette le cose com'erano: serve all'Honeypot, che annulla l'ultimo sabotaggio.
@@ -474,7 +480,7 @@ class Game {
     if (c.step !== 'window') fail('L\'escalation al management si gioca a finestra aperta.');
     if (this.isRole(f, 'red')) fail('Contro un Red Teamer il pareggio non basta: vince lui.');
     const delta = this.cFighterPower(c) - this.cThreatPower(c), was = this.cWinning(c);
-    if (!delta) fail('Le due parti sono già in pareggio.');
+    if (delta <= 0) fail('Chi combatte non è in vantaggio: l\'escalation non cambierebbe niente.');
     c.mBonus += delta;
     this.spend(p, card);
     const txt = `${p.name}: Escalation al management, la minaccia sale a ${this.cThreatPower(c)}: pareggio`;
@@ -504,7 +510,7 @@ class Game {
     const entry = { card: th, mod: 0, trMod: 0, lvMod: 0 };
     c.threats.push(entry);
     const txt = `${p.name}: Alert a cascata, entra ${th.name} (forza ${th.l})`;
-    if (this.outsider(p, c)) this.sabotage(p, txt, card, () => { const i = c.threats.indexOf(entry); if (i > 0) { c.threats.splice(i, 1); this.discard(th); } });
+    if (this.outsider(p, c)) this.sabotage(p, txt, card, () => this.dropThreat(c, th));
     else { this.cEv(c, txt); this.say('trick', 'cascade'); }
     this.touch(c);
   }
@@ -520,7 +526,7 @@ class Game {
     this.addEsp(p);
     c.reassigned = true;
     if (this.shielded(t, p, 'il ticket')) { this.setDeadline(this.to.prep); return; }
-    c.fighter = t.id; c.fBonus = 0; c.asked = []; c.mood = {}; c.passes.clear(); c.lastSab = null;
+    c.fighter = t.id; c.fBonus = 0; c.double = false; c.asked = []; c.mood = {}; c.passes.clear(); c.lastSab = null;
     this.log(`${t.name} eredita il ticket: affronta ${this.threatNames(c)} (forza ${this.cThreatPower(c)}).`, 'fight');
     this.fx({ kind: 'reassign', by: p.id, target: t.id, threat: this.threatNames(c) });
     this.setDeadline(this.to.prep);
@@ -758,7 +764,8 @@ class Game {
       case 'boost': return c.amt > 0 ? 6 + c.amt / 5 : 3;
       case 'lateral': return 4;
       case 'trick': return 7;
-      case 'threat': return 3;
+      // una Minaccia che si batte senza carte è un livello quasi gratis con «Cerca guai»: non è la prima da buttare
+      case 'threat': return this.basePower(p) - p.penalty > c.l + this.vsBonus(c, p) ? 10 + c.lv : 3;
     }
     return 0;
   }

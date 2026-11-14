@@ -514,7 +514,7 @@ function buildDecks(nextId, shuffle) {
   Object.keys(ROLES).forEach(r => add(T, { deck: 'T', type: 'role', role: r, name: ROLES[r].name, d: ROLES[r].text }, 2));
   BOOSTS.forEach(b => add(T, { deck: 'T', type: 'boost', name: b.n, amt: b.amt, tr: b.tr, lv: b.lv || 0, d: b.d }, b.c));
   TRICKS_T.forEach(t => add(T, { deck: 'T', type: 'trick', fx: t[0], name: t[1], text: TRICK_TEXT[t[0]], d: t[3] }, t[2]));
-  add(T, { deck: 'T', type: 'lateral', name: 'Movimento laterale', d: 'L\'attaccante si sposta. Su di te.' }, 3);
+  add(T, { deck: 'T', type: 'lateral', name: 'Movimento laterale', d: 'L\'attaccante si sposta. Su di te.' }, 5);
   GEAR.forEach(g => add(A, {
     deck: 'A', type: 'gear', slot: g[0], name: g[1], bonus: g[2], value: g[3], d: g[4],
     roleBonus: g[6] || null

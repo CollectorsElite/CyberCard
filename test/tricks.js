@@ -361,4 +361,58 @@ function fight(g, f, card) { g.startCombat(f, [card]); g.handle(f.id, { type: 'f
   assert(c.threats.length === 2 && c.threats[1].card === th && g.disc.T.includes(curse) && s.esp === 1);
 }
 
+// 21. Riassegnazione dopo Pair programming: il raddoppio resta a chi l'ha giocato, non passa a chi eredita il ticket
+{
+  const g = setup(), [f, s] = g.players;
+  f.level = 6; s.level = 1;
+  const d = give(g, f, trick('double')), ra = give(g, f, trick('reassign'));
+  g.startCombat(f, [threat(8)]);
+  g.handle(f.id, { type: 'trick', card: d.uid });
+  g.handle(f.id, { type: 'trick', card: ra.uid, target: s.id });
+  const c = g.combat;
+  assert(c.fighter === s.id && !c.double && g.cFighterPower() === g.basePower(s), 'niente raddoppio per chi eredita');
+}
+
+// 22. Escalation al management: solo contro chi è in vantaggio (altrimenti lo aiuterebbe, o si sprecherebbe)
+{
+  const g = setup(), [f, s] = g.players;
+  f.level = 2;
+  const so = give(g, s, trick('standoff'));
+  fight(g, f, threat(9));
+  refuses(() => g.handle(s.id, { type: 'trick', card: so.uid }), 'abbasserebbe la minaccia');
+  assert(s.hand.includes(so) && g.combat.mBonus === 0);
+  const g2 = setup(), [f2] = g2.players;
+  f2.level = 2;
+  const so2 = give(g2, f2, trick('standoff'));
+  fight(g2, f2, threat(9));
+  refuses(() => g2.handle(f2.id, { type: 'trick', card: so2.uid }), 'chi perde non ci guadagna niente');
+}
+
+// 23. Honeypot su Movimento laterale: se la minaccia entrata è stata duplicata, se ne va anche la copia
+{
+  const g = setup(), [f, s] = g.players;
+  f.level = 8;
+  const lat = give(g, s, c => c.type === 'lateral'), th = give(g, s, c => c.type === 'threat');
+  const mt = give(g, f, trick('mate')), hp = give(g, f, trick('honeypot'));
+  const c = fight(g, f, threat(1));
+  g.handle(s.id, { type: 'play', card: lat.uid, threat: th.uid });
+  g.handle(f.id, { type: 'trick', card: mt.uid }); // chi combatte duplica: non è un sabotaggio, l'ultimo resta il laterale
+  assert.strictEqual(c.threats.length, 3);
+  g.handle(f.id, { type: 'trick', card: hp.uid });
+  assert(c.threats.length === 1 && g.disc.T.includes(th), 'via la minaccia laterale e la sua copia');
+}
+
+// 24. Aiuto: l'aiutante pesca la parte concordata, chi combatte il resto
+{
+  const g = setup(), [f, h] = g.players;
+  f.level = 3; h.level = 3;
+  const c = fight(g, f, threat(5, { tr: 3 }));
+  g.handle(f.id, { type: 'askHelp', to: h.id, share: 2 });
+  g.handle(h.id, { type: 'answerHelp', accept: true });
+  const fh = f.hand.length, hh = h.hand.length;
+  for (const p of g.players) g.handle(p.id, { type: 'pass' });
+  assert(!g.combat && h.hand.length - hh === 2 && f.hand.length - fh === 1 && f.level === 4 && h.level === 3);
+  assert(c.share === 2);
+}
+
 console.log('OK tricks');

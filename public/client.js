@@ -529,7 +529,7 @@
       case 'oncall': return fighter && !c.helper;
       case 'ai': case 'reboot': case 'mate': case 'cascade': return true;
       case 'double': return !c.double;
-      case 'standoff': return c.step === 'window' && !(P(c.fighter).role && P(c.fighter).role.role === 'red') && c.fighterPower !== c.threatPower;
+      case 'standoff': return c.step === 'window' && !(P(c.fighter).role && P(c.fighter).role.role === 'red') && c.fighterPower > c.threatPower;
       case 'lunch': return mine || !mp;
     }
     return false;
