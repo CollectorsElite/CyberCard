@@ -63,8 +63,8 @@ function securityHeaders() {
 
 function adminAuthed(req) {
   if (!ADMIN_TOKEN) return false;
-  const u = new URL(req.url || '/', 'http://local');
-  const tok = String(u.searchParams.get('token') || req.headers['x-admin-token'] || '');
+  // solo nell'intestazione: nell'indirizzo finirebbe in cronologia e nei log del proxy
+  const tok = String(req.headers['x-admin-token'] || '');
   const a = Buffer.from(tok), b = Buffer.from(ADMIN_TOKEN);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
@@ -90,6 +90,35 @@ function forceCloseRoom(code, msg) {
   return true;
 }
 
+// Stato di una stanza per il pannello admin: niente carte in mano, solo quello che si vede al tavolo.
+function adminRoom(r) {
+  const g = r.game, byId = new Map(r.members.map(m => [m.id, m]));
+  const status = m => !m ? '' : m.isBot ? 'bot' : m.left ? 'uscito' : m.connected ? 'connesso' : 'disconnesso';
+  const base = {
+    code: r.code, createdAt: r.createdAt, lastActive: r.lastActive,
+    state: !g ? 'lobby' : g.over ? 'finita' : 'in corso',
+    closesAt: (g ? r.startedAt : r.createdAt) + ROOM_MAX_MS,
+    members: r.members.map(m => ({ name: m.name, isBot: !!m.isBot, host: m.id === r.host, status: status(m) }))
+  };
+  if (!g) return base;
+  const c = g.combat, name = id => { const p = g.players.find(x => x.id === id); return p ? p.name : ''; };
+  return {
+    ...base, startedAt: r.startedAt,
+    game: {
+      turn: g.turn, cur: g.current.name, phase: g.phase, winner: g.winner ? name(g.winner) : null,
+      combat: c ? {
+        fighter: name(c.fighter), helper: c.helper ? name(c.helper) : null, step: c.step,
+        threats: c.threats.map(t => t.card.name + (t.copy ? ' (copia)' : '')),
+        fighterPower: g.cFighterPower(c), threatPower: g.cThreatPower(c)
+      } : null,
+      players: g.players.map(p => ({
+        name: p.name, level: p.level, esp: p.esp, role: p.role ? p.role.name : null,
+        handCount: p.hand.length, power: g.basePower(p), status: status(byId.get(p.id))
+      }))
+    }
+  };
+}
+
 function handleAdmin(req, res) {
   const pathOnly = (req.url || '/').split('?')[0];
   if (!ADMIN_TOKEN) return json(res, 404, { error: 'Admin disabilitato (imposta ADMIN_TOKEN).' });
@@ -97,12 +126,8 @@ function handleAdmin(req, res) {
   const q = new URL(req.url || '/', 'http://local').searchParams;
   if (pathOnly === '/admin/api/rooms') {
     return json(res, 200, {
-      rooms: [...rooms.values()].map(r => ({
-        code: r.code, host: r.host, started: !!r.game, over: !!(r.game && r.game.over),
-        members: r.members.length, humans: r.members.filter(m => !m.isBot && !m.left).length,
-        bots: r.members.filter(m => m.isBot).length,
-        createdAt: r.createdAt, lastActive: r.lastActive
-      })),
+      now: Date.now(),
+      rooms: [...rooms.values()].map(adminRoom),
       config: {
         maxRooms: MAX_ROOMS, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS,
         botDelay: BOT_DELAY, timeoutScale: TIMEOUT_SCALE, graceMs: GRACE, roomMaxMs: ROOM_MAX_MS
@@ -110,9 +135,10 @@ function handleAdmin(req, res) {
     });
   }
   if (pathOnly === '/admin/api/close') {
+    if (req.method !== 'POST') return json(res, 405, { error: 'Usa POST.' });
     const code = String(q.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
     if (!code) return json(res, 400, { error: 'Codice mancante.' });
-    if (!forceCloseRoom(code)) return json(res, 404, { error: 'Stanza non trovata.' });
+    if (!forceCloseRoom(code, 'La partita è stata chiusa dall\'amministratore.')) return json(res, 404, { error: 'Stanza non trovata.' });
     return json(res, 200, { ok: true, code });
   }
   return json(res, 404, { error: 'Endpoint admin sconosciuto.' });
@@ -120,6 +146,7 @@ function handleAdmin(req, res) {
 
 const server = http.createServer((req, res) => {
   const url = (req.url || '/').split('?')[0];
+  if (url.startsWith('/admin/api/') && req.method === 'POST') return handleAdmin(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   if (url === '/favicon.ico') { res.writeHead(204); return res.end(); }
   if (url === '/health') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }

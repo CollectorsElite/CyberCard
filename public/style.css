@@ -549,6 +549,26 @@ body.ingame #app{height:100dvh;min-height:0}
 .admin-table th{font-size:12px;font-weight:700;color:var(--mute)}
 .admin-cfg{margin:0;padding-left:18px;font-size:13.5px}
 .admin-app .lead{color:var(--mute);font-size:14.5px;margin-bottom:12px}
+.adm-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.adm-bar h2{margin:0;flex:1 1 auto}
+.adm-at{font-size:12.5px;color:var(--mute)}
+.adm-gh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.adm-gh h3{margin:0 0 4px;font-size:18px}
+.adm-sit{margin:0;font-size:14.5px}
+.adm-time{margin:8px 0 0;font-size:13px;color:var(--mute)}
+.admin-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.adm-lead td{background:rgba(255,210,63,.28)}
+.adm-crown{font-size:11.5px;font-weight:700;color:var(--orange);white-space:nowrap}
+.adm-up{color:var(--green);font-weight:700}
+.adm-down{color:var(--red);font-weight:700}
+.adm-st{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700;border:1.5px solid var(--ink2);white-space:nowrap}
+.adm-st-on{background:#c4e8cd}
+.adm-st-off{background:var(--paper2);color:var(--mute)}
+.adm-st-gone{background:#f2c3bc}
+.adm-st-bot{background:#ddd5f1}
+.adm-turn{font-size:14px;font-weight:600;color:var(--mute)}
+.admin-table abbr{text-decoration:none}
+@media (max-width:600px){.adm-gh{flex-direction:column}.admin-app #screen{padding:10px}.adm-opt{display:none}.admin-table th,.admin-table td{padding:7px 4px}}
 
 /* ---- come si gioca: 3 schede, swipe con scroll-snap nativo ---- */
 #tut{position:fixed;inset:0;z-index:190;background:rgba(6,8,18,.84);display:flex;align-items:center;justify-content:center;padding:10px;padding-bottom:max(10px,env(safe-area-inset-bottom))}

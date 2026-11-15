@@ -62,7 +62,7 @@ Dietro un reverse proxy, inoltra anche l'upgrade WebSocket sul path `/ws`.
 | `ROOM_MAX_MS` | 7200000 | Durata massima (2 h): di una partita dall'avvio (la rivincita riparte da zero), di una lobby dalla creazione. 5 minuti prima un avviso nel registro, poi la stanza si chiude per tutti |
 | `MAX_CREATES_PER_SOCKET` | 5 | Cap create per connessione WebSocket |
 | `MAX_CREATES_PER_IP` | 20 | Cap create per IP / ora |
-| `ADMIN_TOKEN` | _(vuoto)_ | Abilita `/admin.html` e `/admin/api/*`. Vuoto = admin spento |
+| `ADMIN_TOKEN` | _(vuoto)_ | Abilita il pannello `/admin.html` (partite in corso con giocatori, livelli, turno e combattimento; altre stanze; chiusura). Il token va solo nell'intestazione `X-Admin-Token`, la chiusura è una POST. Usare una stringa casuale di almeno 32 caratteri. Vuoto = pannello spento |
 
 Tempi massimi di default: 90 s per le azioni del proprio turno, 60 s per prepararsi al combattimento, 45 s per la finestra di interferenza (si azzera a ogni carta giocata), 25 s per rispondere a una richiesta di aiuto o a una controproposta, 30 s per la fuga.
 
