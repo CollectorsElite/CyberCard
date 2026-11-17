@@ -415,4 +415,21 @@ function fight(g, f, card) { g.startCombat(f, [card]); g.handle(f.id, { type: 'f
   assert(c.share === 2);
 }
 
+// 25. Change freeze di un avversario: su chi sta perdendo è un sabotaggio (+1 Esposizione), su chi vince no
+{
+  const g = setup(), [f, s, t] = g.players;
+  f.level = 1; s.esp = 0; s.role = null;
+  const fr = give(g, s, trick('freeze'));
+  fight(g, f, threat(9));
+  g.handle(s.id, { type: 'trick', card: fr.uid });
+  assert(g.combat.frozen && s.esp === 1, 'congelare chi perde deve costare Esposizione');
+  assert(g.fxs.some(e => e.kind === 'sabotage' && e.by === s.id), 'segnalato come sabotaggio');
+  const g2 = setup(), [f2, s2] = g2.players;
+  f2.level = 8; s2.esp = 0; s2.role = null;
+  const fr2 = give(g2, s2, trick('freeze'));
+  fight(g2, f2, threat(1));
+  g2.handle(s2.id, { type: 'trick', card: fr2.uid });
+  assert(g2.combat.frozen && s2.esp === 0, 'congelare chi vince non è un sabotaggio');
+}
+
 console.log('OK tricks');

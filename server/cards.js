@@ -104,7 +104,7 @@ const TRICKS_A = [
 // Cosa fa ogni carta speciale, in una riga: la leggono scheda, wiki e registro.
 const TRICK_TEXT = {
   poach: 'In un combattimento: l\'aiutante se ne va e non incassa niente. È un sabotaggio: +1 Esposizione.',
-  freeze: 'A finestra aperta: da questo momento nessuno gioca più carte, Sfighe o richieste di aiuto. Si può solo passare. Non vale se chi combatte sta per arrivare a root.',
+  freeze: 'A finestra aperta: da questo momento nessuno gioca più carte, Sfighe o richieste di aiuto. Si può solo passare. Non vale se chi combatte sta per arrivare a root. Sul combattimento di un altro che sta perdendo è un sabotaggio.',
   honeypot: 'In un combattimento: annulla l\'ultimo sabotaggio. Chi l\'aveva giocato prende +1 Esposizione in più.',
   falsepos: 'Annulla il combattimento in corso: nessun premio e nessuna penalità. Se toglie una vittoria a un altro è un sabotaggio, e non ferma chi sta per arrivare a root.',
   oncall: 'Quando combatti: un giocatore a tua scelta ti aiuta gratis, senza poter rifiutare.',

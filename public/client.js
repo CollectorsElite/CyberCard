@@ -802,7 +802,7 @@
         else if (trickNow(card)) {
           switch (card.fx) {
             case 'poach': B.push({ label: `Porta via ${name(c.helper)} · sabotaggio`, cls: 'danger', on: T() }); break;
-            case 'freeze': B.push({ label: 'Congela: da ora si può solo passare', cls: 'primary', on: T() }); break;
+            case 'freeze': { const sab = !mine && !c.winning; B.push({ label: `Congela: da ora si può solo passare${sab ? ' · sabotaggio' : ''}`, cls: sab ? 'danger' : 'primary', on: T() }); break; }
             case 'honeypot': B.push({ label: `Annulla «${c.lastSab.name}» di ${name(c.lastSab.by)}`, cls: 'primary', on: T() }); break;
             case 'falsepos': B.push({ label: mine ? 'Annulla il combattimento: niente premi, niente penalità' : `Annulla il combattimento di ${name(c.fighter)}${c.winning ? ' · sabotaggio' : ''}`, cls: mine || !c.winning ? 'primary' : 'danger', on: T() }); break;
             case 'reboot': B.push({ label: 'Azzera tutti i bonus e le interferenze', cls: 'primary', on: T() }); break;
@@ -973,7 +973,7 @@
         <li><b>Fine turno</b>: massimo 5 carte in mano, scegli tu cosa scartare.</li></ul>
         <h4>Combattimento</h4><p>Forza = livello + asset + carte a uso singolo. Chi combatte si prepara, poi si apre la <b>finestra di interferenza</b>: tutti, compreso chi combatte, devono dichiarare «passo». Ogni carta giocata riapre il giro dei passo, comprese le Sfighe su chi combatte o su chi lo aiuta. Quando tutti hanno passato: se sei in vantaggio vinci livelli e tesori, altrimenti tiri il dado per fuggire (5+, Sysadmin 3+).</p>
         <h4>Aiuto</h4><p>Chi combatte può chiedere aiuto a un avversario offrendo una parte dei tesori. Chi riceve la proposta può accettare, rifiutare o rilanciare con un'altra cifra; a quel punto risponde l'altro, fino a tre controproposte. L'aiutante somma la sua forza, pesca per primo la sua parte e non guadagna livelli.</p>
-        <h4>Sabotaggi ed Esposizione</h4><p>Potenziare la Minaccia di un altro, aggiungerne una con Movimento laterale o giocare una Sfiga su qualcuno (in qualsiasi momento) è un <b>sabotaggio</b>: +1 Esposizione. A 4 scatta l'<b>audit del SOC</b>: −1 livello e si riparte da zero. L'Ingegnere sociale non lascia tracce.</p>
+        <h4>Sabotaggi ed Esposizione</h4><p>Potenziare la Minaccia di un altro, aggiungerne una con Movimento laterale o giocare una Sfiga su qualcuno (in qualsiasi momento) è un <b>sabotaggio</b>: +1 Esposizione. Lo stesso vale per le Interferenze speciali giocate contro chi combatte: il pulsante lo segnala con «sabotaggio». Anche alcune Minacce, se perdi, ti fanno salire l'Esposizione invece di toglierti livelli. A 4 scatta l'<b>audit del SOC</b>: −1 livello e si riparte da zero. L'Ingegnere sociale non lascia tracce dei sabotaggi.</p>
         <h4>Carte speciali</h4><p>Alcune Interferenze e carte a uso singolo hanno una regola propria, scritta sulla scheda: portano via l'aiutante, annullano un sabotaggio, congelano il combattimento, scaricano la penalità su un altro o gli passano l'intero ticket. Quelle giocate contro un altro sono sabotaggi. Alcune penalità fanno <b>saltare il turno</b>: il segnalino resta accanto al nome finché non lo sconti.</p>
         <h4>Asset e credito</h4><p>Uno slot per tipo: Hardware, Software, Credenziali, Gadget. Puoi equipaggiarti, cambiare ruolo e vendere in qualsiasi momento, ma mai durante un combattimento. Vendendo asset accumuli credito: ogni 1000 è +1 livello.</p>
         <h4>Ruoli</h4><ul>${Object.values(ROLES).map(r => `<li><b>${r.name}</b>: ${r.text}</li>`).join('')}</ul>

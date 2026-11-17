@@ -377,10 +377,13 @@ class Game {
     const c = this.combatPlay(p);
     if (c.step !== 'window') fail('Il Change freeze si gioca a finestra aperta.');
     if (this.fighter(c).level + this.cLevels(c) >= WIN_LEVEL) fail('Quando c\'è di mezzo root nessun change freeze regge.');
+    // congelare il combattimento di un altro mentre perde gli toglie ogni rimedio: è un sabotaggio
+    const sabot = this.outsider(p, c) && !this.cWinning(c);
     c.frozen = true; c.offer = null;
     this.spend(p, card);
-    this.cEv(c, `${p.name}: Change freeze. Da ora nessuno gioca più carte in questo combattimento`, 'sys');
-    this.fx({ kind: 'freeze', by: p.id, quip: this.say('trick', 'freeze') });
+    const txt = `${p.name}: Change freeze. Da ora nessuno gioca più carte in questo combattimento`;
+    if (sabot) { this.sabotage(p, txt, card); this.fx({ kind: 'freeze', by: p.id, quip: '' }); }
+    else { this.cEv(c, txt, 'sys'); this.fx({ kind: 'freeze', by: p.id, quip: this.say('trick', 'freeze') }); }
     this.touch(c);
   }
   t_honeypot(p, card) {
