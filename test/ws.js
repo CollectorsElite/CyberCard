@@ -163,7 +163,8 @@ async function until(fn, ms = 8000, what = 'condizione') {
 
     // rivincita
     a.send({ t: 'rematch' });
-    await until(() => a.last.view && !a.last.view.over && a.last.view.turn === 1, 3000, 'rivincita');
+    try { await until(() => a.last.view && !a.last.view.over && a.last.view.turn === 1, 3000, 'rivincita'); }
+    catch (e) { throw new Error(`rivincita: host ${a.last.room.host === a.session.you}, over ${a.last.view.over}, turno ${a.last.view.turn}, membri ${JSON.stringify(a.last.room.members.map(m => [m.name, m.connected, m.left]))}, ultimi errori ${a.errors.slice(-4).join(' / ')}, ws ${a.ws.readyState}`); }
 
     // file statici e header di sicurezza
     const res = await fetch(`http://127.0.0.1:${PORT}/`);

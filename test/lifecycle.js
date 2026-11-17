@@ -3,6 +3,7 @@
 const assert = require('assert');
 const path = require('path');
 const { spawn } = require('child_process');
+const kids = []; const kid = k => { kids.push(k); return k; }; // in caso di errore si spengono tutti i server di prova
 const WebSocket = require('ws');
 
 const PORT = 5000 + Math.floor(Math.random() * 1000);
@@ -11,7 +12,7 @@ const env = {
   DISCONNECT_GRACE_MS: '200', MAX_CREATES_PER_SOCKET: '3', MAX_CREATES_PER_IP: '50',
   NODE_ENV: 'development'
 };
-const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env, stdio: ['ignore', 'pipe', 'inherit'] });
+const srv = kid(spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env, stdio: ['ignore', 'pipe', 'inherit'] }));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const URL = `ws://127.0.0.1:${PORT}/ws`;
 
@@ -40,6 +41,23 @@ async function until(fn, ms = 5000, what = 'condizione') {
 (async () => {
   try {
     await wait(400);
+
+    // --- l'host ricarica la pagina (rientra entro il margine): resta host ---
+    {
+      const h0 = client(), g0 = client();
+      await Promise.all([h0.open, g0.open]);
+      h0.send({ t: 'create', name: 'Host0' });
+      await until(() => h0.session, 3000, 'host0 session');
+      g0.send({ t: 'join', code: h0.session.code, name: 'Guest0' });
+      await until(() => g0.session && g0.last && g0.last.room.members.length === 2, 3000, 'guest0 in');
+      h0.ws.close(); await wait(50);
+      const h1 = client(); await h1.open;
+      h1.send({ t: 'resume', code: h0.session.code, token: h0.session.token });
+      await until(() => h1.session && h1.last, 3000, 'host0 rientra');
+      await wait(400); // oltre il margine di prova (200 ms)
+      assert.strictEqual(g0.last.room.host, h0.session.you, 'l\'host ha perso il ruolo per una ricarica');
+      h1.ws.close(); g0.ws.close(); await wait(50);
+    }
 
     // --- host disconnect in lobby → host passa al survivor ---
     const h = client(), g = client();
@@ -117,9 +135,9 @@ async function until(fn, ms = 5000, what = 'condizione') {
 
     // production: Origin obbligatorio
     const PORT2 = PORT + 1;
-    const srv2 = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
+    const srv2 = kid(spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
       env: { ...env, PORT: String(PORT2), NODE_ENV: 'production' }, stdio: ['ignore', 'pipe', 'inherit']
-    });
+    }));
     await wait(400);
     const url2 = `ws://127.0.0.1:${PORT2}/ws`;
     const refused = await new Promise(r => {
@@ -139,9 +157,9 @@ async function until(fn, ms = 5000, what = 'condizione') {
 
     // durata massima: preavviso nel registro, poi la stanza si chiude per tutti e non si rientra
     const PORT3 = PORT + 2;
-    const srv3 = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
+    const srv3 = kid(spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
       env: { ...env, PORT: String(PORT3), ROOM_MAX_MS: '2000', JANITOR_MS: '100', BOT_DELAY: '100000' }, stdio: ['ignore', 'pipe', 'inherit']
-    });
+    }));
     await wait(400);
     const t = new WebSocket(`ws://127.0.0.1:${PORT3}/ws`), tm = [];
     let tClosed = null;
@@ -164,9 +182,38 @@ async function until(fn, ms = 5000, what = 'condizione') {
     await until(() => lm.some(m => m.t === 'expired'), 3000, 'niente rientro');
     late.close(); srv3.kill();
     console.log('OK durata massima');
+
+    // nessun umano connesso: la partita si ferma; al rientro riparte
+    {
+    const PORT4 = PORT + 3;
+    const srv4 = kid(spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
+      env: { ...env, PORT: String(PORT4), BOT_DELAY: '40', DISCONNECT_GRACE_MS: '100' }, stdio: ['ignore', 'pipe', 'inherit']
+    }));
+    await wait(400);
+    const open4 = () => new Promise(r => { const w = new WebSocket(`ws://127.0.0.1:${PORT4}/ws`), st = { w, m: [] }; w.on('message', d => st.m.push(JSON.parse(d.toString()))); w.on('open', () => r(st)); });
+    const lastView = st => { const s = st.m.filter(m => m.t === 'sync' && m.view).pop(); return s && s.view; };
+    const h = await open4();
+    h.w.send(JSON.stringify({ t: 'create', name: 'Solo' }));
+    await until(() => h.m.some(m => m.t === 'session'), 3000, 'sessione pausa');
+    const ses = h.m.find(m => m.t === 'session');
+    h.w.send(JSON.stringify({ t: 'addBot' })); h.w.send(JSON.stringify({ t: 'addBot' }));
+    await wait(150); h.w.send(JSON.stringify({ t: 'start' })); await wait(100); h.w.send(JSON.stringify({ t: 'tutDone' }));
+    await until(() => lastView(h), 3000, 'partita avviata');
+    h.w.close();
+    await wait(1500); // con i bot a 40 ms, senza pausa qui passerebbero decine di mosse
+    const back = await open4();
+    back.w.send(JSON.stringify({ t: 'resume', code: ses.code, token: ses.token }));
+    await until(() => lastView(back), 3000, 'rientro');
+    const seqAt = v => v.log[v.log.length - 1].i;
+    const atReturn = seqAt(lastView(back));
+    assert(atReturn - seqAt(lastView(h)) <= 4, `la partita è andata avanti senza nessuno: ${seqAt(lastView(h))} -> ${atReturn}`);
+    await until(() => seqAt(lastView(back)) > atReturn + 3 || lastView(back).needs.includes(ses.you), 4000, 'la partita non riparte');
+    back.w.close(); srv4.kill();
+    console.log('OK pausa senza giocatori');
+    }
     process.exit(0);
   } catch (e) {
     console.error('FALLITO:', e.message);
-    srv.kill(); process.exit(1);
+    kids.forEach(k => k.kill()); process.exit(1);
   }
 })();

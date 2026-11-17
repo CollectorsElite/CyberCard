@@ -558,6 +558,8 @@ class Game {
   // non scade mentre si tratta, e a trattativa chiusa resta qualche secondo per reagire.
   propose(c, offer) {
     c.offer = offer;
+    // chi combatte che tratta un aiuto non ha più «passato»: se gli dicono di no, deve poter decidere ancora
+    c.passes.delete(c.fighter);
     c.offerDeadline = this.now() + this.to.offer;
     this.deadline = Math.max(this.deadline, c.offerDeadline + Math.round(this.to.offer / 2));
   }

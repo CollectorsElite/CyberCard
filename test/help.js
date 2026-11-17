@@ -102,4 +102,20 @@ const fails = (fn, re) => assert.throws(fn, e => re.test(e.message), 'atteso err
   assert(tr >= 3);
 }
 
+// chi combatte ha già passato, poi chiede aiuto e riceve un no: il combattimento non si chiude da solo,
+// deve poter chiedere a qualcun altro o giocare ancora
+{
+  const { g } = setup(), c = g.combat;
+  g.p('p0').level = 1;
+  g.handle('p0', { type: 'fight' });
+  g.handle('p0', { type: 'pass' });
+  g.handle('p0', { type: 'askHelp', to: 'p1', share: 1 });
+  g.handle('p2', { type: 'pass' });
+  g.handle('p1', { type: 'pass' });
+  g.handle('p1', { type: 'answerHelp', accept: false });
+  assert(g.combat === c && c.step === 'window', 'combattimento chiuso senza far decidere chi combatte');
+  assert(g.needs().includes('p0'));
+  g.handle('p0', { type: 'askHelp', to: 'p2', share: 1 }); // può chiedere a un altro
+}
+
 console.log('OK help');

@@ -78,7 +78,7 @@
         if (m.view) {
           const fresh = S.gid !== m.view.gid;
           trackLevels(fresh ? null : prev, m.view);
-          if (fresh) { S.seen = new Set(m.view.hand.map(c => c.uid)); S.shownUid = m.view.revealed ? m.view.revealed.card.uid : null; }
+          if (fresh) { S.seen = new Set(m.view.hand.map(c => c.uid)); S.shownUid = m.view.revealed ? m.view.revealed.card.uid : null; $('#toasts').innerHTML = ''; } // gli avvisi della partita prima non servono più
           S.gid = m.view.gid;
           S.deadlineAt = m.view.deadlineIn != null ? Date.now() + m.view.deadlineIn : 0;
           S.offerAt = m.view.offerIn != null ? Date.now() + m.view.offerIn : 0;

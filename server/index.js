@@ -241,7 +241,19 @@ function liftTutIfReady(room) {
   const g = room.game;
   if (!g.over && g.turn === 1 && g.phase === 'open' && !g.combat) g.setDeadline(g.to.turn);
 }
-function afterChange(room) { if (room.closed) return; liftTutIfReady(room); room.lastActive = Date.now(); noteEvents(room); broadcast(room); pump(room); }
+function afterChange(room) { if (room.closed) return; liftTutIfReady(room); resumeIfPaused(room); room.lastActive = Date.now(); noteEvents(room); broadcast(room); pump(room); }
+// Senza nessun umano connesso (tutti col telefono in standby, per dire) la partita si ferma: niente bot
+// che giocano da soli e niente turni chiusi d'ufficio. Al rientro i timer ripartono da dove erano.
+const anyHumanOnline = room => room.members.some(m => !m.isBot && !m.left && m.connected);
+function resumeIfPaused(room) {
+  const g = room.game;
+  if (!room.pausedAt || !g || !anyHumanOnline(room)) return;
+  const d = Date.now() - room.pausedAt;
+  room.pausedAt = 0;
+  g.deadline += d;
+  if (g.combat && g.combat.offer) g.combat.offerDeadline += d;
+  room.holdUntil = Math.max(room.holdUntil || 0, Date.now() + 800); // un attimo per riorientarsi
+}
 const speedOf = room => SPEEDS[room.speed] || 1;
 // Guarda cosa è appena successo e, se va letto, sposta in avanti il momento in cui i bot possono agire.
 function noteEvents(room) {
@@ -287,6 +299,7 @@ function transferHost(room, exceptId) {
 function pump(room) {
   clearTimeout(room.timer); room.timer = null;
   const g = room.game; if (!g || g.over) return;
+  if (!anyHumanOnline(room)) { if (!room.pausedAt) room.pausedAt = Date.now(); return; }
   if (room.tutHeld) {
     room.timer = setTimeout(() => {
       room.timer = null;
@@ -362,7 +375,7 @@ function startGame(room) {
   });
   room.members = players;
   room.startedAt = Date.now(); room.warned = false;
-  room.fxSeen = 0; room.holdUntil = 0; room.lastRev = null; room.hadCombat = false;
+  room.fxSeen = 0; room.holdUntil = 0; room.lastRev = null; room.hadCombat = false; room.pausedAt = 0;
   room.tutReady = new Set();
   room.tutHeld = players.some(m => !m.isBot);
   if (room.tutHeld) room.game.setDeadline(Math.round(TUT_HOLD_MS * TIMEOUT_SCALE));
@@ -503,8 +516,15 @@ function detach(ws, leaving) {
   if (!humansLeft(room).length) {
     clearTimeout(room.timer); rooms.delete(room.code); return;
   }
-  // Host failover anche su disconnect (lobby e partita).
-  if (room.host === m.id) transferHost(room, m.id);
+  // Host failover: subito se esce, dopo il margine di riconnessione se si disconnette
+  // (una pagina ricaricata o un telefono in standby per pochi secondi non devono costare il ruolo di host).
+  if (room.host === m.id) {
+    if (leaving) transferHost(room, m.id);
+    else setTimeout(() => {
+      if (rooms.get(room.code) !== room || room.closed || room.host !== m.id || m.connected) return;
+      transferHost(room, m.id); afterChange(room);
+    }, GRACE + 50).unref();
+  }
   afterChange(room);
 }
 
