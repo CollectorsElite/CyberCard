@@ -534,6 +534,73 @@
     }
     return false;
   }
+  // Perché in questo momento la carta non si può usare per lo scopo principale ('' = si può, o non c'è niente da dire).
+  // Rispecchia i controlli del server: se una regola cambia là, va cambiata anche qui.
+  const ROOT_MSG = 'Chi combatte sta per arrivare a root (livello 10): contro di lui questa carta non vale.';
+  function whyNot(card, where) {
+    const v = V(), c = v.combat, me = ME();
+    if (!card || v.over) return '';
+    const fighter = c && c.fighter === S.you, mine = c && (fighter || c.helper === S.you);
+    const mp = c && P(c.fighter).level + c.levels >= 10;
+    const frozen = 'Il combattimento è congelato da «Change freeze»: si può solo passare.';
+    const flee = 'Il combattimento è arrivato alla fuga: non si giocano più carte.';
+    const prep = 'Aspetta la finestra di interferenza: durante la preparazione giocano solo chi combatte e chi aiuta.';
+    const noFight = 'Si gioca durante un combattimento.';
+    const manage = 'Durante un combattimento non si gestiscono gli asset: aspetta che finisca.';
+    // carte da combattimento generiche: '' se adesso si possono giocare
+    const fightWhy = () => !c ? noFight : c.frozen ? frozen : c.step === 'flee' ? flee : (c.step === 'prep' && !mine) ? prep : '';
+    if (where === 'slot' || where === 'role') return c ? manage : '';
+    switch (card.type) {
+      case 'gear': case 'role': return c ? manage : '';
+      case 'levelup': return c ? 'Si usa fuori dai combattimenti.' : me.level >= 9 ? 'L\'ultimo livello si prende solo vincendo un combattimento.' : '';
+      case 'oneshot':
+        if (card.escape) return c && c.step === 'flee' && fighter ? '' : 'Si usa solo nel tuo combattimento, al momento della fuga: ti sganci senza tirare il dado.';
+        return fightWhy() && (!c ? 'Il bonus si gioca durante un combattimento. Fuori puoi solo venderla.' : fightWhy());
+      case 'boost': return fightWhy();
+      case 'lateral': return fightWhy() || (v.hand.some(x => x.type === 'threat') ? '' : 'Ti serve anche una Minaccia in mano da far entrare nel combattimento.');
+      case 'threat':
+        if (c) return 'Durante un combattimento una Minaccia in mano entra solo con «Movimento laterale».';
+        if (v.cur !== S.you) return 'Si affronta nel tuo turno con «Cerca guai», dopo un ticket che non era una Minaccia.';
+        if (v.phase === 'open') return 'Prima apri il ticket: se non esce una Minaccia, potrai affrontare questa con «Cerca guai».';
+        if (v.phase !== 'after') return 'In questo turno hai già combattuto o analizzato i log: «Cerca guai» si fa solo subito dopo un ticket senza Minaccia.';
+        return '';
+      case 'trick': return trickWhy(card, { c, fighter, mine, mp, frozen, flee, prep, noFight });
+    }
+    return '';
+  }
+  function trickWhy(card, k) {
+    const { c, fighter, mine, mp, frozen, flee, prep, noFight } = k, me = ME();
+    if (card.fx === 'ooo') return me.ooo ? 'È già attiva: la prossima Sfiga contro di te torna al mittente.' : '';
+    if (trickNow(card)) return '';
+    if (card.fx === 'scapegoat') return 'Si usa solo nel tuo combattimento, al momento della fuga: se ti prendono, paga un altro.';
+    if (card.fx === 'reassign') {
+      if (!c || !fighter || c.step !== 'prep') return 'Si gioca solo nel tuo combattimento, durante la preparazione, prima di chiedere aiuto.';
+      if (c.frozen) return frozen;
+      if (c.reassigned) return 'Questo ticket è già stato riassegnato una volta.';
+      return 'Non si riassegna dopo aver chiesto o ottenuto aiuto.';
+    }
+    if (!c) return noFight;
+    if (c.frozen) return frozen;
+    if (c.step === 'flee') return flee;
+    if (c.step === 'prep' && !mine) return prep;
+    switch (card.fx) {
+      case 'poach': return !c.helper ? 'Chi combatte non ha un aiutante da portare via.' : 'Non puoi portare via l\'aiuto dal tuo stesso combattimento.';
+      case 'freeze': return mp ? ROOT_MSG : 'Si gioca a finestra aperta.';
+      case 'honeypot': return !c.lastSab ? 'In questo combattimento non c\'è nessun sabotaggio da annullare.' : 'L\'ultimo sabotaggio è tuo: non puoi annullarlo.';
+      case 'falsepos': case 'lunch': return ROOT_MSG;
+      case 'oncall': return !fighter ? 'Si gioca solo nel tuo combattimento.' : 'Hai già un aiutante.';
+      case 'double': return 'Pair programming è già stato giocato in questo combattimento.';
+      case 'standoff':
+        if (c.step !== 'window') return 'Si gioca a finestra aperta.';
+        if (P(c.fighter).role && P(c.fighter).role.role === 'red') return 'Chi combatte è Red Teamer e vince i pareggi: l\'escalation non serve.';
+        return `Chi combatte non è in vantaggio (${c.fighterPower} contro ${c.threatPower}): l'escalation non cambierebbe niente.`;
+    }
+    return '';
+  }
+  function whyHTML(card, where) {
+    const w = whyNot(card, where);
+    return w ? `<p class="why" role="note"><b>Non ora:</b> ${esc(w)}</p>` : '';
+  }
   function handHTML() {
     const v = V(), over = v.hand.length > v.handMax && !v.over;
     return `<div class="handhead"><span>La tua mano</span><b class="${over ? 'r' : ''}">${v.hand.length}/${v.handMax}</b>${over ? '<span class="r">a fine turno scegli cosa scartare</span>' : ''}</div>
@@ -630,7 +697,7 @@
       dismiss: true, cls: 'sheet',
       title: () => (card() || {}).name || '',
       valid: () => !!card(),
-      html: () => cardDetail(card()),
+      html: () => cardDetail(card()) + (where === 'view' ? '' : whyHTML(card(), where)),
       buttons: () => [...(where === 'view' ? [] : sheetButtons(find(), where)), { label: 'Chiudi', cls: 'ghost' }]
     });
   }
@@ -672,13 +739,15 @@
         if (free) B.push({ label: `Vendi per ${card.value} di credito`, on: go({ type: 'sell', card: card.uid }) });
         break;
       case 'levelup':
-        if (free) B.push(me.level < 9 ? { label: 'Usa: +1 livello', cls: 'primary', on: go({ type: 'levelUp', card: card.uid }) } : { label: 'Non utilizzabile a livello 9', disabled: true });
+        if (free && me.level < 9) B.push({ label: 'Usa: +1 livello', cls: 'primary', on: go({ type: 'levelUp', card: card.uid }) });
         break;
       case 'role':
         if (free) B.push({ label: me.role ? `Assumi (lasci ${me.role.name})` : 'Assumi il ruolo', cls: 'primary', on: go({ type: 'takeRole', card: card.uid }) });
         break;
       case 'curse':
-        v.players.filter(p => p.id !== S.you).forEach(p => B.push({ label: `Gioca su ${p.name} (liv ${p.level}) · sabotaggio`, cls: 'danger', on: go({ type: 'curse', card: card.uid, target: p.id }) }));
+        v.players.filter(p => p.id !== S.you).forEach(p => (c && c.frozen && (p.id === c.fighter || p.id === c.helper))
+          ? B.push({ label: `${p.name}: congelato da «Change freeze»`, disabled: true })
+          : B.push({ label: `Gioca su ${p.name} (liv ${p.level}) · sabotaggio`, cls: 'danger', on: go({ type: 'curse', card: card.uid, target: p.id }) }));
         break;
       case 'threat':
         if (myTurn && v.phase === 'after') B.push({ label: 'Cerca guai: affrontala ora', cls: 'primary', on: go({ type: 'trouble', card: card.uid }) });
