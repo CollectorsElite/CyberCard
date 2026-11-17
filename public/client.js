@@ -134,6 +134,62 @@
     });
   }
 
+  /* ================= carte giocate ================= */
+  // Ogni carta messa in tavola (da chiunque) parte dalla postazione di chi la gioca, si ferma grande al
+  // centro del tavolo con una didascalia e finisce sul bersaglio. In coda, una alla volta.
+  const FLY_MS = 1750;
+  const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function queueCard(e) {
+    (S.flyQ = S.flyQ || []).push(e);
+    requestAnimationFrame(() => requestAnimationFrame(runFly)); // dopo il ridisegno: il bersaglio deve già esserci
+  }
+  function runFly() {
+    if (S.flying || !S.flyQ || !S.flyQ.length || !S.view) return;
+    const e = S.flyQ.shift();
+    S.flying = true;
+    const done = () => { S.flying = false; runFly(); };
+    try { flyCard(e, S.flyQ.length ? 1100 : FLY_MS).then(done, done); } catch (x) { done(); }
+  }
+  const rectOf = sel => { const el = sel && document.querySelector(sel); const r = el && el.getBoundingClientRect(); return r && r.width ? r : null; };
+  const tileSel = id => id === S.you ? '#me .id' : `.opp[data-pid="${CSS.escape(String(id))}"]`;
+  function flyCaption(e) {
+    const v = V(), c = v.combat, who = e.by === S.you ? 'Giochi' : `${esc(name(e.by))} gioca`;
+    const on = id => id === S.you ? ' su di te' : ` su ${esc(name(id))}`;
+    const t = e.card.type, me = e.by === S.you;
+    if (t === 'threat') return me ? 'Cerchi guai' : `${esc(name(e.by))} cerca guai`;
+    if (t === 'levelup') return me ? 'Sali di livello' : `${esc(name(e.by))} sale di livello`;
+    if (t === 'curse') return `${me ? 'Giochi' : esc(name(e.by)) + ' gioca'} una Sfiga${on(e.dest)}`;
+    if (e.dest === 'm') return who + ' sulla Minaccia';
+    if (e.dest === 'f') return who + (c ? on(c.fighter) : '');
+    if (e.dest === 'arena' || e.dest === e.by) return who;
+    return who + on(e.dest);
+  }
+  function flyCard(e, ms) {
+    let host = $('#fly');
+    if (!host) { host = document.createElement('div'); host.id = 'fly'; host.setAttribute('aria-hidden', 'true'); document.body.appendChild(host); }
+    const el = document.createElement('div');
+    el.className = 'flyer'; el.inert = true;
+    el.innerHTML = cardHTML({ ...e.card, uid: 'fly' }, { lg: true }) + `<p class="fly-cap">${flyCaption(e)}</p>`;
+    host.appendChild(el);
+    const W = el.offsetWidth, H = el.offsetHeight, vw = innerWidth, vh = innerHeight;
+    const mid = (r => r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: vw / 2, y: vh / 2 })(rectOf('#arena'));
+    const ctr = r => r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
+    const from = ctr(e.by === S.you ? rectOf('.hand') || rectOf('#me') : rectOf(tileSel(e.by))) || { x: vw / 2, y: -H };
+    const dst = e.dest === 'm' ? rectOf('#arena .side.m') || rectOf('#arena .threats') : e.dest === 'f' ? rectOf('#arena .side.f') : e.dest === 'arena' || e.dest === e.by ? null : rectOf(tileSel(e.dest));
+    const to = ctr(dst) || mid;
+    const at = (p, s, r, o) => ({ transform: `translate(${Math.round(p.x - W / 2)}px,${Math.round(p.y - H / 2)}px) scale(${s}) rotate(${r}deg)`, opacity: o });
+    const frames = reduceMotion()
+      ? [at(mid, 1, 0, 0), { ...at(mid, 1, 0, 1), offset: .12 }, { ...at(mid, 1, 0, 1), offset: .82 }, at(mid, 1, 0, 0)]
+      : [at(from, .3, -14, 0),
+         { ...at(mid, 1.06, 3, 1), offset: .24, easing: 'cubic-bezier(.16,1,.3,1)' },
+         { ...at(mid, 1, 0, 1), offset: .34 },
+         { ...at(mid, 1, 0, 1), offset: .7, easing: 'cubic-bezier(.7,0,.84,0)' },
+         { ...at(to, .28, 9, dst ? .9 : 0), offset: .95 },
+         at(to, .22, 9, 0)];
+    const a = el.animate(frames, { duration: ms, fill: 'both' });
+    return a.finished.then(() => el.remove(), () => el.remove());
+  }
+
   /* ================= helper di stato ================= */
   const V = () => S.view;
   const P = id => S.view.players.find(p => p.id === id);
@@ -163,6 +219,7 @@
     const me = S.you, q = e.quip ? ' «' + e.quip + '»' : '';
     switch (e.kind) {
       case 'roll': splashRoll(e); break;
+      case 'card': queueCard(e); break;
       // Finestra, passo e richieste tra altri si leggono già su tavolo, badge e registro:
       // gli avvisi restano per ciò che ti riguarda di persona, così non coprono gli avversari.
       case 'sabotage': if (e.target === me) toast(`Sabotaggio: ${e.text}.${q}`, 'bad', 7000); break;
@@ -488,12 +545,7 @@
         </div>
         <p class="stake">In palio: <b>+${c.levels} ${pl(c.levels, 'livello', 'livelli')}</b> e <b>${c.treasures} ${pl(c.treasures, 'tesoro', 'tesori')}</b>${h ? ` (${c.share} a ${esc(h.name)})` : ''}</p>`;
     }
-    if (v.over) {
-      const rank = v.players.slice().sort((a, b) => (b.id === v.winner) - (a.id === v.winner) || b.level - a.level);
-      return `${hud(v.winner === S.you ? 'Hai vinto' : 'Partita finita', v.winner === S.you ? 'Hai ottenuto root. Ora la reperibilità è tua.' : `${esc(name(v.winner))} ha ottenuto root. Cambiate le password.`, ' over')}
-        <div class="finale"><span class="burst big" aria-hidden="true">root</span>
-          <ol class="rank">${rank.map(p => `<li${p.id === v.winner ? ' class="first"' : ''}>${avaHTML(p)}<span class="nm">${esc(p.name)}</span><span class="tt">${esc(p.title)}</span><b>${p.level}</b></li>`).join('')}</ol></div>`;
-    }
+    if (v.over) return finaleHTML(v);
     let k, m, cls = '';
     if (S.tut) { k = 'In pausa'; m = `In attesa che tutti chiudano le istruzioni (${S.tut.ready}/${S.tut.total}).`; }
     else if (v.cur === me.id) {
@@ -641,6 +693,28 @@
   function whyHTML(card, where) {
     const w = whyNot(card, where);
     return w ? `<p class="why" role="note"><b>Non ora:</b> ${esc(w)}</p>` : '';
+  }
+  // Fine partita: il terminale in cui il vincitore ha appena preso root, accanto la classifica.
+  function finaleHTML(v) {
+    const win = P(v.winner), mine = v.winner === S.you;
+    const user = String(win.name).split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '') || 'utente';
+    const go = v.fx.slice().reverse().find(e => e.kind === 'gameover');
+    const rank = v.players.slice().sort((a, b) => (b.id === v.winner) - (a.id === v.winner) || b.level - a.level);
+    return `${hud(mine ? 'Hai vinto' : 'Partita finita', mine ? 'Hai ottenuto root. Ora la reperibilità è tua.' : `${esc(win.name)} ha ottenuto root. Cambiate le password.`, ' over')}
+      <div class="finale">
+        <section class="term" aria-label="${mine ? 'Hai ottenuto root' : esc(win.name) + ' ha ottenuto root'} al giro ${v.turn}">
+          <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>${esc(user)}@escalation: ~</span></div>
+          <div class="term-body">
+            <p class="tl" aria-hidden="true"><span class="pr">${esc(user)}@escalation:~$</span> sudo -i</p>
+            <p class="tl" aria-hidden="true">[sudo] password for ${esc(user)}: <span class="pw">********</span></p>
+            <p class="tl" aria-hidden="true"><span class="pr rt">root@escalation:~#</span> whoami</p>
+            <p class="rootword" aria-hidden="true"><span>root</span></p>
+            <p class="who">${avaHTML(win)}<span><b>${mine ? 'Tu' : esc(win.name)}</b>, al giro ${v.turn}</span></p>
+            ${go && go.quip ? `<p class="fin-quip">${esc(go.quip)}</p>` : ''}
+          </div>
+        </section>
+        <ol class="rank" aria-label="Classifica">${rank.map(p => `<li${p.id === v.winner ? ' class="first"' : ''}>${avaHTML(p)}<span class="nm">${esc(p.name)}${p.id === S.you && !mine ? ' (tu)' : ''}<small>${esc(p.title)}</small></span><span class="lvl" title="Livello">${p.level}</span></li>`).join('')}</ol>
+      </div>`;
   }
   function handHTML() {
     const v = V(), over = v.hand.length > v.handMax && !v.over;

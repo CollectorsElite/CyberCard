@@ -10,6 +10,16 @@ const HELP_COUNTERS = 3; // controproposte ammesse in una trattativa di aiuto, p
 const FROZEN = 'Change freeze: in questo combattimento non si gioca più niente. Si può solo passare.';
 const DEFAULT_TIMEOUTS = { turn: 90000, prep: 60000, window: 45000, offer: 25000, flee: 30000 };
 
+// Azioni che mettono in tavola una carta della mano, e dove va a finire (per l'animazione sul client):
+// 'm' la Minaccia, 'f' chi combatte, l'id di un giocatore, 'arena' il centro del tavolo.
+const PLAYED = {
+  play: (c, a) => c.type === 'oneshot' ? (a.side === 'f' ? 'f' : 'm') : 'm',
+  curse: (c, a) => a.target,
+  trouble: () => 'm',
+  levelUp: (c, a, p) => p.id,
+  trick: (c, a) => a.target || (a.side === 'f' ? 'f' : a.side === 'm' ? 'm' : 'arena')
+};
+
 class GameError extends Error {}
 const fail = m => { throw new GameError(m); };
 const pl = (n, s, p) => (n === 1 ? s : p);
@@ -119,7 +129,11 @@ class Game {
     if (!a || typeof a.type !== 'string') fail('Azione non valida.');
     const fn = this['a_' + a.type];
     if (typeof fn !== 'function') fail('Azione sconosciuta.');
-    fn.call(this, this.p(pid), a);
+    const p = this.p(pid), at = this.fxs.length;
+    const card = PLAYED[a.type] && p.hand.find(c => c.uid === a.card);
+    fn.call(this, p, a);
+    // carta giocata: un evento per tutti, messo prima degli effetti che ha prodotto (prima la carta, poi cosa fa)
+    if (card && !p.hand.includes(card)) this.fxs.splice(at, 0, { kind: 'card', by: p.id, card: { ...card }, dest: PLAYED[a.type](card, a, p), i: ++this.seq }); // non «to»: quello rende l'evento privato
     this.version++;
   }
   ownFree(p) {

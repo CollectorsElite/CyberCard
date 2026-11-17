@@ -15,6 +15,10 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
+/* spazio della barra di scorrimento sempre riservato: se compare per un attimo (un'animazione che sfora)
+   il tavolo non si sposta; in orizzontale non si scorre mai */
+html{scrollbar-gutter:stable}
+body{overflow-x:clip}
 body{background:#241810 url('/board/desk.jpg') center/cover fixed;color:var(--cream);font:500 15px/1.4 var(--f);-webkit-text-size-adjust:100%}
 button,input{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -243,15 +247,91 @@ body.ingame #app{height:100dvh;min-height:0}
 .threats .card+.card{margin-left:calc(var(--cw-lg)*-.38)}
 .stake{font-size:13px;color:var(--cream);text-align:center}
 .stake b{color:var(--yellow)}
-.finale{flex:1;display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap}
-.burst.big{width:96px;height:96px;font-size:27px;transform:rotate(-8deg)}
-.rank{list-style:none;margin:0;padding:0;display:grid;gap:4px;min-width:min(100%,250px)}
-.rank li{display:flex;align-items:center;gap:8px;background:var(--paper);color:var(--text);border:2px solid var(--ink);border-radius:8px;padding:4px 8px}
+/* fine partita: il terminale del vincitore (righe che compaiono, poi ROOT col lettering del logo) e la classifica */
+.finale{flex:1;min-height:0;display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap;padding:2px 0;overflow:auto}
+.term{width:min(100%,440px);background:#060a17;border:var(--out);border-radius:12px;box-shadow:5px 6px 0 rgba(0,0,0,.55);overflow:hidden;color:#c9d6cc}
+.term-bar{display:flex;align-items:center;gap:6px;background:var(--paper2);border-bottom:var(--out);padding:6px 10px}
+.term-bar i{width:12px;height:12px;border-radius:50%;border:2px solid var(--ink);background:var(--red)}
+.term-bar i:nth-child(2){background:var(--yellow)}
+.term-bar i:nth-child(3){background:#3fc277}
+.term-bar span{margin-left:8px;font:700 12.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.term-body{padding:10px 15px 13px;font:500 12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.term .pr{color:#5fe08f}
+.term .pr.rt{color:var(--orange)}
+.term .pw{letter-spacing:.12em}
+.rootword{position:relative;isolation:isolate;margin:4px 0 8px;padding-left:4px;font:900 clamp(52px,6.2vw,82px)/.95 var(--f);font-stretch:75%;text-transform:uppercase;letter-spacing:.01em}
+.rootword span{display:inline-block;color:var(--yellow);-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-shadow:5px 6px 0 var(--orange),9px 11px 0 var(--ink);transform:skewX(-10deg)}
+.rootword::before{content:"";position:absolute;z-index:-1;left:-18%;top:-40%;width:90%;height:180%;background:repeating-conic-gradient(rgba(245,138,31,.42) 0 6deg,transparent 6deg 18deg);-webkit-mask:radial-gradient(closest-side,#000 25%,transparent 78%);mask:radial-gradient(closest-side,#000 25%,transparent 78%)}
+.term .who{display:flex;align-items:center;gap:9px;font:600 15px var(--f);color:var(--cream)}
+.term .who b{color:var(--yellow);font-weight:800}
+.term .who .ava{width:30px;height:30px;font-size:12px}
+.fin-quip{position:relative;margin-top:10px;background:var(--paper);color:var(--text);border:2px solid var(--ink);border-radius:12px;padding:6px 10px;font:italic 500 13.5px/1.3 var(--f)}
+
+.fin-quip::before{content:"";position:absolute;top:-9px;left:18px;width:14px;height:14px;background:var(--paper);border-left:2px solid var(--ink);border-top:2px solid var(--ink);transform:rotate(45deg)}
+.rank{list-style:none;margin:0;padding:0;display:grid;gap:6px;min-width:min(100%,270px)}
+.rank li{display:flex;align-items:center;gap:9px;background:var(--paper);color:var(--text);border:2px solid var(--ink);border-radius:9px;padding:6px 8px 6px 10px;box-shadow:2px 3px 0 rgba(6,8,16,.75)}
 .rank li.first{background:var(--yellow)}
-.rank .ava{width:24px;height:24px;font-size:10px;border-width:2px}
-.rank .nm{flex:1;font-weight:800;font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rank .tt{flex:none;font-size:11.5px}
-.rank b{font-size:18px;font-weight:900;font-stretch:80%;min-width:1.4em;text-align:right}
+.rank .ava{width:26px;height:26px;font-size:10.5px;border-width:2px}
+.rank .nm{flex:1;min-width:0;font-weight:800;font-size:14px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank .nm small{display:block;font-size:11.5px;font-weight:600;color:var(--mute);overflow:hidden;text-overflow:ellipsis}
+.rank .lvl{min-width:32px;height:32px;font-size:21px;border-radius:7px}
+.term .tl{animation:fin-in .28s ease-out both}
+.term .tl:nth-child(1){animation-delay:.15s}
+.term .tl:nth-child(2){animation-delay:.55s}
+.term .tl:nth-child(3){animation-delay:.95s}
+.rootword span{animation:root-in .55s cubic-bezier(.16,1,.3,1) 1.3s both}
+.rootword::before{animation:rays-in 1.1s cubic-bezier(.16,1,.3,1) 1.35s both}
+.term .who{animation:fin-in .3s ease-out 1.75s both}
+.fin-quip{animation:fin-in .3s ease-out 2s both}
+.rank li{animation:fin-in .3s ease-out both}
+.rank li:nth-child(1){animation-delay:2.1s}.rank li:nth-child(2){animation-delay:2.18s}.rank li:nth-child(3){animation-delay:2.26s}.rank li:nth-child(4){animation-delay:2.34s}.rank li:nth-child(5){animation-delay:2.42s}.rank li:nth-child(6){animation-delay:2.5s}
+@keyframes fin-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes root-in{from{opacity:0;transform:skewX(-10deg) scale(2.1) rotate(-5deg)}to{opacity:1;transform:skewX(-10deg)}}
+@keyframes rays-in{from{opacity:0;transform:rotate(-40deg) scale(.5)}to{opacity:1;transform:none}}
+/* desktop: la scena (#table) ha altezza fissa ed è un contenitore; il finale si adatta allo spazio che c'è */
+.finale{max-height:calc(100cqh - 58px)} /* 100cqh è già al netto del margine della scena; tolti titolo e spazio */
+@container (max-height:470px){
+  .fin-quip,.term .tl:nth-child(-n+2){display:none}
+  .rootword{font-size:58px}
+}
+@container (max-height:330px){
+  .term{width:min(100%,300px)}
+  .term .tl{display:none}
+  .term-body{padding:8px 14px 10px}
+  .rootword{font-size:44px;margin:2px 0 5px}
+  .rank{gap:4px;min-width:min(100%,220px)}
+  .rank li{padding:2px 6px 2px 8px}
+  .rank .nm small{display:none}
+  .rank .ava{width:22px;height:22px;font-size:9.5px}
+  .rank .lvl{min-width:26px;height:26px;font-size:17px}
+}
+@container (max-height:260px){
+  .rank,.term-bar{display:none}
+  .term-body{padding:6px 12px 8px}
+  .rootword{font-size:34px;margin:0 0 4px}
+  .term .who{font-size:13.5px}
+  .term .who .ava{width:24px;height:24px;font-size:10px}
+}
+/* telefono: con un nome lungo il titolo del turno prende tutta la riga e il messaggio va sotto, invece di restare in colonna */
+@media (max-width:640px){.hud{flex-wrap:wrap}.hud-m{flex:1 1 100%;min-width:0}}
+/* telefono: terminale ridotto all'essenziale (la battuta resta nel registro), classifica su due colonne */
+@media (max-width:640px){
+  .finale{gap:10px;align-content:flex-start}
+  .term .tl:nth-child(-n+2),.fin-quip{display:none}
+  .rootword{font-size:54px;margin:2px 0 6px}
+  .term .who{font-size:14px}
+  .rank{grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;gap:5px}
+  .rank li{padding:4px 6px;gap:6px}
+  .rank .ava{display:none}
+  .rank .nm{font-size:13px}
+  .rank .nm small{display:none}
+  .rank .lvl{min-width:26px;height:26px;font-size:17px}
+}
+/* carte giocate: volano dalla postazione al centro del tavolo e poi sul bersaglio */
+#fly{position:fixed;inset:0;z-index:150;pointer-events:none;overflow:hidden}
+.flyer{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:8px;--cw:clamp(118px,13vw,160px);will-change:transform,opacity}
+.flyer .card{box-shadow:6px 8px 0 rgba(6,8,16,.8)}
+.fly-cap{background:var(--paper);color:var(--text);border:2px solid var(--ink);border-radius:999px;padding:4px 12px;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:2px 3px 0 rgba(6,8,16,.8)}
 
 /* La tua postazione. */
 #me{background:var(--paper);color:var(--text);border:var(--out);border-radius:12px;padding:8px 10px;box-shadow:var(--drop);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center}
@@ -396,7 +476,7 @@ body.ingame #app{height:100dvh;min-height:0}
   .threats{gap:14px;padding-left:0}
   .threats .card+.card{margin-left:0}
   .stake{font-size:15px}
-  .burst.big{width:150px;height:150px;font-size:42px}
+
   .rank li{padding:6px 10px}
   .rank .nm{font-size:15px}
   #log,#log.open{grid-area:log;max-height:none;overflow-y:auto;cursor:default;padding:10px 12px;display:flex;flex-direction:column-reverse}
@@ -701,6 +781,7 @@ body.ingame #app{height:100dvh;min-height:0}
   .splash{animation:none}
   /* niente movimento: il livello resta colorato con +1 / −1 fermo finché dura l'effetto */
   .lvl.lv-up,.lvl.lv-down,.lvt-up,.lvt-down,.lvlpop{animation:none!important}
+  .finale *,.finale *::before{animation:none!important}
   .lvl.lv-up{background:var(--green);color:#fff8e8}
   .lvl.lv-down{background:var(--red);color:#fff8e8}
   .lvlpop{transform:translateY(-8px)}

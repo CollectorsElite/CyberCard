@@ -20,7 +20,7 @@ const PACE = BOT_DELAY / 1600;
 const SPEEDS = { slow: 1.5, normal: 1, fast: 0.6 };
 const ACT_MS = { openTicket: 2000, trouble: 2200, loot: 1800, endTurn: 1500, fight: 2200, askHelp: 2000, answerHelp: 1800, counterHelp: 1800, play: 2400, curse: 2400, trick: 2400, pass: 1100, flee: 1800, rollback: 1800 };
 const ACT_DEFAULT_MS = 1300; // equipaggiare, vendere, cambiare ruolo, carte livello
-const HOLD_MS = { roll: 4300, audit: 2600, win: 2200, curse: 2400, sabotage: 2200, swap: 2200, reassign: 2400, scapegoat: 2200, falsepos: 2200, freeze: 2000, honeypot: 2200, bounce: 2200, oncall: 2000, skip: 2200, reboot: 1800, kept: 1800 };
+const HOLD_MS = { card: 1900, roll: 4300, audit: 2600, win: 2200, curse: 2400, sabotage: 2200, swap: 2200, reassign: 2400, scapegoat: 2200, falsepos: 2200, freeze: 2000, honeypot: 2200, bounce: 2200, oncall: 2000, skip: 2200, reboot: 1800, kept: 1800 };
 const REVEAL_HOLD_MS = 2600, COMBAT_END_HOLD_MS = 2000;
 const GRACE = process.env.DISCONNECT_GRACE_MS !== undefined ? +process.env.DISCONNECT_GRACE_MS : 15000;
 const TIMEOUT_SCALE = +process.env.TIMEOUT_SCALE || 1;

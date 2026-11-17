@@ -432,4 +432,19 @@ function fight(g, f, card) { g.startCombat(f, [card]); g.handle(f.id, { type: 'f
   assert(g2.combat.frozen && s2.esp === 0, 'congelare chi vince non è un sabotaggio');
 }
 
+// 26. Carta giocata: un evento «card» con chi, cosa e dove, visibile a tutti i giocatori (serve all'animazione)
+{
+  const g = setup(), [f, s, t] = g.players;
+  f.level = 5;
+  const tr = give(g, s, c => c.type === 'curse');
+  g.handle(s.id, { type: 'curse', card: tr.uid, target: t.id });
+  for (const p of g.players) {
+    const e = g.view(p.id).fx.filter(x => x.kind === 'card').pop();
+    assert(e && e.by === s.id && e.card.uid === tr.uid && e.dest === t.id, 'evento carta giocata visibile a ' + p.id);
+  }
+  const before = g.fxs.length;
+  try { g.handle(s.id, { type: 'curse', card: 123456, target: t.id }); } catch (e) { /* rifiutata */ }
+  assert.strictEqual(g.fxs.length, before, 'una giocata rifiutata non lascia eventi');
+}
+
 console.log('OK tricks');
