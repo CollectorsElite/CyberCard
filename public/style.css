@@ -468,6 +468,9 @@ body.ingame #app{height:100dvh;min-height:0}
 .mbox h3{font-size:23px;font-weight:800;font-stretch:80%;line-height:1.1;margin-bottom:10px}
 .mbody{font-size:14.5px}
 .mbody p{margin:6px 0}
+.speed{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 4px}
+.speed-l{font-size:13.5px;font-weight:700;margin-right:4px}
+.speed .btn{padding:6px 12px;font-size:14px}
 .mbody .why{margin:10px 0 0;padding:8px 10px;border:2px solid var(--ink2);border-radius:10px;background:var(--paper2);font-size:14px;line-height:1.35}
 .mbody .why b{color:var(--red)}
 .mbody .warn{color:var(--red);font-weight:800}

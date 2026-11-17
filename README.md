@@ -55,7 +55,7 @@ Dietro un reverse proxy, inoltra anche l'upgrade WebSocket sul path `/ws`.
 | Variabile | Default | Uso |
 |---|---|---|
 | `PORT` | 3000 | Porta HTTP e WebSocket |
-| `BOT_DELAY` | 900 | Millisecondi tra una mossa e l'altra dei bot |
+| `BOT_DELAY` | 1600 | Scala del ritmo dei bot (1600 = ritmo standard). Ogni mossa ha la sua pausa e dopo un evento da leggere (ticket girato, tiro di fuga, esito, Sfiga, audit) i bot aspettano che si sia visto. Nella lobby l'host sceglie la velocità: Tranquilla (×1,5), Normale, Svelta (×0,6) |
 | `TIMEOUT_SCALE` | 1 | Moltiplicatore dei tempi massimi (0.5 = partite più rapide) |
 | `DISCONNECT_GRACE_MS` | 15000 | Tolleranza prima che le mosse di un disconnesso diventino automatiche |
 | `MAX_ROOMS` | 200 | Numero massimo di stanze contemporanee |

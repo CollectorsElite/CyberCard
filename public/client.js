@@ -358,6 +358,7 @@
   // Una carta per famiglia di colore, la Minaccia al centro.
   const HERO = ['curse-reset-password-obbligatorio', 'gear-hw-laptop-pieno-di-adesivi', 'threat-ransomware-con-assistenza-clienti', 'trick-change-freeze', 'oneshot-caffe-della-macchinetta'];
   // Il colore della carta dice la famiglia: stessa legenda in home, wiki e regole.
+  const BOT_SPEEDS = [['slow', 'Tranquilla'], ['normal', 'Normale'], ['fast', 'Svelta']];
   const FAMILIES = [['red', 'Minacce', 'da combattere'], ['violet', 'Sfighe', 'sugli altri, quando vuoi'], ['green', 'Interferenze', 'durante un combattimento'], ['blue', 'Ruoli e uso singolo', 'poteri e colpi di mano'], ['orange', 'Asset e livello', 'equipaggiamento e promozioni']];
   const famHTML = () => `<ul class="fams" aria-label="I colori delle carte">${FAMILIES.map(([c, n, d]) => `<li class="fam-${c}"><b>${n}</b> ${d}</li>`).join('')}</ul>`;
   function homeHTML() {
@@ -410,9 +411,11 @@
             <input id="fBot" class="botname" data-f="bot" maxlength="32" aria-label="Nome del bot" value="${esc(S.form.bot != null ? S.form.bot : (r.nextBot || ''))}"${n >= r.max ? ' disabled' : ''}>
             <button class="btn" type="button" data-do="addBot"${n >= r.max ? ' disabled' : ''}>Aggiungi un bot</button>
           </div>
+          <div class="speed" role="group" aria-label="Velocità dei bot"><span class="speed-l">Velocità dei bot</span>
+            ${BOT_SPEEDS.map(([k, l]) => `<button type="button" class="btn${(r.speed || 'normal') === k ? ' primary' : ''}" data-do="speed" data-id="${k}" aria-pressed="${(r.speed || 'normal') === k}">${l}</button>`).join('')}</div>
           <button class="btn primary big" type="button" data-do="start"${!ready ? ' disabled' : ''}>Avvia la partita</button>
           <p class="hint">${!ready ? `Servono almeno ${r.min} giocatori: invita con il link oppure riempi i posti con dei bot.` : `Puoi ancora aggiungere bot fino a ${r.max} giocatori.`}</p>`
-          : `<p class="hint">Solo l'host può avviare la partita.</p>`}
+          : `<p class="hint">Solo l'host può avviare la partita. Velocità dei bot: ${esc(((BOT_SPEEDS.find(x => x[0] === (r.speed || 'normal')) || [])[1] || '').toLowerCase())}.</p>`}
       </section></div>`;
   }
 
@@ -1181,6 +1184,7 @@
         return send({ t: 'addBot', name });
       }
       case 'remove': return send({ t: 'removeMember', id: el.dataset.id });
+      case 'speed': return send({ t: 'setSpeed', speed: el.dataset.id });
       case 'start': return send({ t: 'start' });
       case 'rematch': return send({ t: 'rematch' });
       case 'leave': return askLeave();

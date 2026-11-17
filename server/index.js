@@ -13,6 +13,15 @@ const { buildDecks } = require('./cards');
 
 const PORT = +process.env.PORT || 3000;
 const BOT_DELAY = process.env.BOT_DELAY !== undefined ? +process.env.BOT_DELAY : 1600;
+// Ritmo dei bot. Ogni mossa ha la sua pausa (le mosse che contano più lente, la gestione più svelta);
+// dopo un evento da leggere (ticket girato, tiro di dado, esito, Sfiga, audit) nessun bot agisce
+// finché non si è visto. Tutto scala con BOT_DELAY (i test lo abbassano) e con la velocità scelta dall'host.
+const PACE = BOT_DELAY / 1600;
+const SPEEDS = { slow: 1.5, normal: 1, fast: 0.6 };
+const ACT_MS = { openTicket: 2000, trouble: 2200, loot: 1800, endTurn: 1500, fight: 2200, askHelp: 2000, answerHelp: 1800, counterHelp: 1800, play: 2400, curse: 2400, trick: 2400, pass: 1100, flee: 1800, rollback: 1800 };
+const ACT_DEFAULT_MS = 1300; // equipaggiare, vendere, cambiare ruolo, carte livello
+const HOLD_MS = { roll: 4300, audit: 2600, win: 2200, curse: 2400, sabotage: 2200, swap: 2200, reassign: 2400, scapegoat: 2200, falsepos: 2200, freeze: 2000, honeypot: 2200, bounce: 2200, oncall: 2000, skip: 2200, reboot: 1800, kept: 1800 };
+const REVEAL_HOLD_MS = 2600, COMBAT_END_HOLD_MS = 2000;
 const GRACE = process.env.DISCONNECT_GRACE_MS !== undefined ? +process.env.DISCONNECT_GRACE_MS : 15000;
 const TIMEOUT_SCALE = +process.env.TIMEOUT_SCALE || 1;
 const TUT_HOLD_MS = 3 * 60 * 1000;
@@ -207,7 +216,7 @@ function botName(room, raw) {
 function roomView(room, me) {
   return {
     code: room.code, host: room.host, you: me ? me.id : null, started: !!room.game, over: !!(room.game && room.game.over),
-    min: MIN_PLAYERS, max: MAX_PLAYERS, nextBot: room.game ? null : suggestBotName(room),
+    min: MIN_PLAYERS, max: MAX_PLAYERS, nextBot: room.game ? null : suggestBotName(room), speed: room.speed || 'normal',
     members: room.members.map(m => ({ id: m.id, name: m.name, isBot: m.isBot, connected: m.isBot || m.connected, left: !!m.left }))
   };
 }
@@ -232,7 +241,26 @@ function liftTutIfReady(room) {
   const g = room.game;
   if (!g.over && g.turn === 1 && g.phase === 'open' && !g.combat) g.setDeadline(g.to.turn);
 }
-function afterChange(room) { if (room.closed) return; liftTutIfReady(room); room.lastActive = Date.now(); broadcast(room); pump(room); }
+function afterChange(room) { if (room.closed) return; liftTutIfReady(room); room.lastActive = Date.now(); noteEvents(room); broadcast(room); pump(room); }
+const speedOf = room => SPEEDS[room.speed] || 1;
+// Guarda cosa è appena successo e, se va letto, sposta in avanti il momento in cui i bot possono agire.
+function noteEvents(room) {
+  const g = room.game;
+  if (!g) return;
+  let hold = 0;
+  for (const e of g.fxs) if (e.i > room.fxSeen) hold = Math.max(hold, HOLD_MS[e.kind] || 0);
+  room.fxSeen = g.seq;
+  const rev = g.revealed ? g.revealed.card.uid : null;
+  if (rev && rev !== room.lastRev) hold = Math.max(hold, REVEAL_HOLD_MS);
+  room.lastRev = rev;
+  if (room.hadCombat && !g.combat) hold = Math.max(hold, COMBAT_END_HOLD_MS);
+  room.hadCombat = !!g.combat;
+  if (hold) room.holdUntil = Math.max(room.holdUntil, Date.now() + hold * PACE * speedOf(room));
+}
+function botWait(room, a) {
+  const base = (ACT_MS[a.type] || ACT_DEFAULT_MS) * PACE * speedOf(room) * (0.85 + Math.random() * 0.3);
+  return Math.max(base, (room.holdUntil || 0) - Date.now());
+}
 
 function allowCreate(ws) {
   if (++ws.ctx.createTries > MAX_CREATES_PER_SOCKET) return false;
@@ -292,7 +320,7 @@ function pump(room) {
     const a = actorFor(id);
     if (!a) continue;
     const m = room.members.find(x => x.id === id);
-    const delay = !m.isBot ? 300 : a.type === 'pass' ? BOT_DELAY * 0.4 : BOT_DELAY * (0.7 + Math.random() * 0.6);
+    const delay = m.isBot ? botWait(room, a) : Math.max(300, (room.holdUntil || 0) - now);
     schedule(id, delay, true);
     return;
   }
@@ -301,7 +329,7 @@ function pump(room) {
     if (!m.isBot || m.left) continue;
     const a = decide(g, m.id);
     if (!a) continue;
-    schedule(m.id, BOT_DELAY * (0.7 + Math.random() * 0.6), false);
+    schedule(m.id, botWait(room, a), false);
     return;
   }
   let wake = g.nextDeadline();
@@ -334,6 +362,7 @@ function startGame(room) {
   });
   room.members = players;
   room.startedAt = Date.now(); room.warned = false;
+  room.fxSeen = 0; room.holdUntil = 0; room.lastRev = null; room.hadCombat = false;
   room.tutReady = new Set();
   room.tutHeld = players.some(m => !m.isBot);
   if (room.tutHeld) room.game.setDeadline(Math.round(TUT_HOLD_MS * TIMEOUT_SCALE));
@@ -393,6 +422,12 @@ function handleMessage(ws, msg) {
       if (!name) return send(ws, { t: 'error', msg: 'Scrivi un nome.' });
       if (room.members.some(m => m.name.toLowerCase() === name.toLowerCase())) return send(ws, { t: 'error', msg: 'Nome già in uso.' });
       room.members.push({ id: newId(), token: '', name, isBot: true, connected: true });
+      return afterChange(room);
+    }
+    case 'setSpeed': {
+      if (!isHost) return send(ws, { t: 'error', msg: 'Solo l\'host sceglie la velocità dei bot.' });
+      if (!Object.prototype.hasOwnProperty.call(SPEEDS, msg.speed)) return send(ws, { t: 'error', msg: 'Velocità non valida.' });
+      room.speed = msg.speed;
       return afterChange(room);
     }
     case 'renameBot': {
