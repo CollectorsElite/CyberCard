@@ -73,9 +73,11 @@
         break;
       case 'sync': {
         S.actPending = false;
+        const prev = S.view;
         S.room = m.room; S.you = m.room.you; S.view = m.view; S.tut = m.tut || null;
         if (m.view) {
           const fresh = S.gid !== m.view.gid;
+          trackLevels(fresh ? null : prev, m.view);
           if (fresh) { S.seen = new Set(m.view.hand.map(c => c.uid)); S.shownUid = m.view.revealed ? m.view.revealed.card.uid : null; }
           S.gid = m.view.gid;
           S.deadlineAt = m.view.deadlineIn != null ? Date.now() + m.view.deadlineIn : 0;
@@ -95,6 +97,41 @@
       case 'kicked': clearSession(); toast('L\'host ti ha rimosso dalla stanza.', 'warn'); render(); break;
       case 'left': clearSession(); render(); break;
     }
+  }
+
+  /* ================= animazione dei livelli ================= */
+  // Ogni client confronta i livelli col sync precedente: chi sale o scende si vede su tutti gli schermi.
+  // L'effetto vive nell'HTML per LV_MS; se nel frattempo la zona si ridisegna, applyLevelFx riallinea
+  // l'animazione col tempo già trascorso (delay negativo), così non riparte da capo.
+  const LV_MS = 2600;
+  function trackLevels(prev, v) {
+    if (!prev || prev.gid !== v.gid) { S.lvlFx = {}; return; }
+    const now = Date.now();
+    for (const p of v.players) {
+      const old = prev.players.find(x => x.id === p.id);
+      if (!old || old.level === p.level) continue;
+      const cur = S.lvlFx[p.id], d = p.level - old.level;
+      const live = cur && now - cur.t0 < LV_MS && Math.sign(cur.d) === Math.sign(d);
+      S.lvlFx[p.id] = { d: live ? cur.d + d : d, t0: now };
+    }
+    clearTimeout(S.lvlTimer);
+    if (Object.keys(S.lvlFx).length) S.lvlTimer = setTimeout(() => { S.lvlFx = {}; if (S.view) render(); }, LV_MS + 50);
+  }
+  function lvFx(p) { const f = S.lvlFx && S.lvlFx[p.id]; return f && Date.now() - f.t0 < LV_MS ? f : null; }
+  function lvlHTML(p) {
+    const f = lvFx(p);
+    if (!f) return `<span class="lvl" title="Livello">${p.level}</span>`;
+    const up = f.d > 0, txt = (up ? '+' : '−') + Math.abs(f.d);
+    return `<span class="lvl ${up ? 'lv-up' : 'lv-down'}" title="Livello" data-fxt="${f.t0}">${p.level}<b class="lvlpop" aria-hidden="true">${txt}</b></span>`;
+  }
+  const lvTile = p => { const f = lvFx(p); return f ? (f.d > 0 ? ' lvt-up' : ' lvt-down') : ''; };
+  function applyLevelFx(root) {
+    const now = Date.now();
+    root.querySelectorAll('[data-fxt]').forEach(el => {
+      const ago = Math.max(0, now - +el.dataset.fxt) + 'ms';
+      const tile = el.closest('.opp, .id');
+      [el, el.querySelector('.lvlpop'), tile].forEach(x => { if (x) x.style.animationDelay = '-' + ago; });
+    });
   }
 
   /* ================= helper di stato ================= */
@@ -310,6 +347,7 @@
     if (opened) log.scrollIntoView({ block: 'end' }); // su telefono il registro aperto sta in fondo al tavolo: portalo in vista
     $('#me').classList.toggle('active', v.cur === S.you && !v.over);
     paint($('#me'), meHTML(me), '_k');
+    applyLevelFx($('#board'));
     paint($('#handwrap'), handHTML(), '_k');
     v.hand.forEach(c => S.seen.add(c.uid));
     $('#actions').classList.toggle('need', v.needs.includes(S.you) && !v.over);
@@ -392,10 +430,10 @@
     } else if (v.over && v.winner === p.id) st = '<span class="st ok">root</span>';
     else if (turn) st = '<span class="st wait">di turno</span>';
     const off = m && !m.connected, gear = p.gear || {};
-    return `<div class="opp${turn ? ' active' : ''}${off ? ' off' : ''}" data-pid="${esc(p.id)}" data-seat="${p.seat}" role="button" tabindex="0" aria-label="${esc(p.name)}, livello ${p.level}">${st}
+    return `<div class="opp${turn ? ' active' : ''}${off ? ' off' : ''}${lvTile(p)}" data-pid="${esc(p.id)}" data-seat="${p.seat}" role="button" tabindex="0" aria-label="${esc(p.name)}, livello ${p.level}">${st}
       <div class="id">${avaHTML(p)}
         <div class="who"><div class="on">${esc(p.name)}</div><div class="tt">${esc(p.title)}${p.isBot ? ' <span class="badge bot">bot</span>' : off ? ' <span class="badge off">offline</span>' : ''}${flags(p)}</div></div>
-        <span class="lvl" title="Livello">${p.level}</span></div>
+        ${lvlHTML(p)}</div>
       <div class="ostats"><span><small>Forza</small><b>${p.power - p.penalty}</b></span><span><small>Carte</small><b>${p.handCount}</b></span><span class="oesp"><small><span class="lg-only">Esposizione</span><span class="sm-only" title="Esposizione">Esp.</span></small>${espPips(p)}</span></div>
       <div class="minis">${p.role ? cardHTML(p.role, { mini: true }) : '<span class="oslot" title="Nessun ruolo">Ruolo</span>'}${Object.keys(SLOTS).map(s => gear[s] ? cardHTML(gear[s], { mini: true }) : `<span class="oslot" title="${SLOTS[s]}: vuoto">${s.toUpperCase()}</span>`).join('')}</div></div>`;
   }
@@ -490,9 +528,9 @@
       const g = me.gear[s];
       return `<button type="button" class="slot${g ? ' full' : ''}" data-slot="${s}" aria-label="${SLOTS[s]}${g ? ': ' + esc(g.name) + ', +' + me.gearBonus[s] : ': vuoto'}">${g ? faceHTML(g) + `<span class="sb">+${me.gearBonus[s]}</span>` : ''}<span class="sl">${SLOTS[s]}</span></button>`;
     };
-    return `<div class="id" data-seat="${me.seat}">${avaHTML(me)}
+    return `<div class="id${lvTile(me)}" data-seat="${me.seat}">${avaHTML(me)}
         <div class="who"><div class="on">${esc(me.name)}</div><div class="tt">${esc(me.title)}${flags(me)}</div></div>
-        <span class="lvl" title="Livello">${me.level}</span></div>
+        ${lvlHTML(me)}</div>
       <div class="stats">
         <span><small>Forza</small><b>${me.power - me.penalty}${me.penalty ? `<em class="r" title="Penalità al prossimo combattimento">policy −${me.penalty}</em>` : ''}</b></span>
         <span class="credit"><small>Credito</small><b>${me.credit}</b><i class="bar c${cr}" title="1000 di credito valgono un livello"></i></span>
