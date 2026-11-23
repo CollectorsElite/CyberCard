@@ -321,9 +321,10 @@ class Game {
       const th = this.handCard(p, a.threat, 'threat');
       this.removeFromHand(p, card); this.removeFromHand(p, th); this.discard(card);
       c.threats.push({ card: th, mod: 0, trMod: 0, lvMod: 0 });
-      txt = `${p.name}: Movimento laterale, entra ${th.name} (forza ${th.l}). «${th.d}»`;
+      txt = `${p.name}: Movimento laterale, entra ${th.name} (forza ${th.l}).`;
       if (sabot) this.sabotage(p, txt, card, () => this.dropThreat(c, th));
       else this.cEv(c, txt);
+      if (th.d) this.log(`«${th.d}»`, 'quip'); // nel fumetto, come quando la Minaccia esce dal mazzo
     }
     this.touch(c);
   }
